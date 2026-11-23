@@ -1,0 +1,18 @@
+---
+import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
+---
+
+<header class="h-16 border-b border-parede bg-papel">
+	<div class="mx-auto flex h-full max-w-5xl items-center px-6">
+		<a href="/" class="inline-flex items-center gap-3 text-carbono no-underline">
+			<span
+				data-splash-alvo
+				aria-hidden="true"
+				class="inline-flex h-10 w-10 shrink-0 select-none [&>svg]:h-full [&>svg]:w-full"
+			>
+				<Fragment set:html={LOGO_PROVISORIA_SVG} />
+			</span>
+			<span class="text-lg font-semibold tracking-tight">WhiteRoom</span>
+		</a>
+	</div>
+</header>

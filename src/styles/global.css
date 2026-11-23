@@ -8,3 +8,24 @@
 	--color-parede: #ebeae6;
 	--color-sombra: #c6c5c1;
 }
+
+html {
+	scrollbar-gutter: stable;
+}
+
+#wr-splash {
+	display: none;
+}
+
+html.splash-ativa {
+	overflow: hidden;
+}
+
+html.splash-ativa #wr-splash {
+	display: grid;
+	place-items: center;
+}
+
+html.splash-ativa [data-splash-alvo] {
+	visibility: hidden;
+}

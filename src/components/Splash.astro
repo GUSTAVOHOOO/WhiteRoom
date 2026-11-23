@@ -1,0 +1,27 @@
+---
+import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
+---
+
+<div
+	id="wr-splash"
+	data-splash-overlay
+	aria-hidden="true"
+	class="fixed inset-0 z-9999 select-none"
+>
+	<div data-splash-fundo class="absolute inset-0 bg-papel"></div>
+	<div
+		data-splash-logo
+		class="pointer-events-none relative z-10 block h-[55vmin] w-[55vmin] will-change-transform [&>svg]:h-full [&>svg]:w-full"
+	>
+		<Fragment set:html={LOGO_PROVISORIA_SVG} />
+	</div>
+	<canvas
+		data-splash-canvas
+		class="pointer-events-none absolute inset-0 z-20 block h-full w-full opacity-0"
+	></canvas>
+</div>
+
+<script>
+	import { iniciarSplash } from '../scripts/splash/controlador';
+	iniciarSplash();
+</script>
