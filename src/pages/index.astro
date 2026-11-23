@@ -12,6 +12,14 @@ const projetos = (await getCollection('projetos')).sort((a, b) => a.data.ordem -
 		(() => {
 			const CHAVE = 'wr-splash-vista';
 			const params = new URLSearchParams(window.location.search);
+			if (params.has('debug')) {
+				const root = document.documentElement;
+				root.classList.add('splash-ativa', 'splash-debug');
+				if (params.get('debug') === 'captura') {
+					root.classList.add('splash-captura');
+				}
+				return;
+			}
 			const bruto = params.get('splash') ?? '';
 			const flags = bruto
 				.split(',')

@@ -1,10 +1,12 @@
 ---
+import refJpg from '../../75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg';
 import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
 ---
 
 <div
 	id="wr-splash"
 	data-splash-overlay
+	data-splash-ref-jpg={refJpg.src}
 	aria-hidden="true"
 	class="fixed inset-0 z-9999 select-none"
 >
@@ -15,6 +17,10 @@ import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
 	>
 		<Fragment set:html={LOGO_PROVISORIA_SVG} />
 	</div>
+	<svg
+		data-splash-linhas
+		class="pointer-events-none absolute inset-0 z-[15] hidden h-full w-full"
+	></svg>
 	<canvas
 		data-splash-canvas
 		class="pointer-events-none absolute inset-0 z-20 block h-full w-full opacity-0"
