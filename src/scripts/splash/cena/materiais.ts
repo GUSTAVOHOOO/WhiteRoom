@@ -197,6 +197,34 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 					outgoingLight = uCorExterna;
 				} else if ( wrNLocal.y > 0.85 && vWrLocalPos.y > 0.495 ) {
 					outgoingLight = uCorTopo;
+				} else if (
+					uMascaraOmbroR > 0.5 &&
+					vWrLocalPos.x < 0.499 &&
+					vWrLocalPos.z > -0.295 &&
+					vWrLocalPos.z < 0.295 &&
+					vWrLocalPos.y > 0.042 &&
+					vWrLocalPos.y < 0.320
+				) {
+					// Furo interno ("olho") do R: base horizontal (peitoril) totalmente clara (#EBEAE6)
+					// e teto curvo superior direito em sombra contínua (#C6C5C1) sem faixa escura no fundo
+					// nem degrau quebrado de auto-sombra da barra superior do R
+					float wrXmm = ( vWrLocalPos.x + 0.5 ) * 1000.0;
+					float wrYmm = ( vWrLocalPos.y + 0.5 ) * 1000.0;
+					float wrYCorte = 610.0 - 0.15 * ( 1000.0 - wrXmm );
+					float wrSombraFuro = ( wrNLocal.y < 0.72 && wrYmm > wrYCorte ) ? 1.0 : 0.0;
+					outgoingLight = mix( uCorInterna, uCorSombra, wrSombraFuro );
+				} else if (
+					uMascaraDireitaR > 0.5 &&
+					vWrLocalPos.x > -0.165 &&
+					vWrLocalPos.y < -0.200
+				) {
+					// Parede fundo-direita vista exclusivamente através do furo interno do R:
+					// sombra diagonal sutil restrita ao canto inferior esquerdo do vão (sem faixa vertical)
+					float wrXmm = ( vWrLocalPos.x + 0.5 ) * 1000.0;
+					float wrYmm = ( vWrLocalPos.y + 0.5 ) * 1000.0;
+					float wrYDiag = 196.0 - 0.212 * ( wrXmm - 363.0 );
+					float wrSombraVao = ( wrYmm < wrYDiag ) ? 1.0 : 0.0;
+					outgoingLight = mix( uCorInterna, uCorSombra, wrSombraVao );
 				} else {
 					float wrEmSombra = 0.0;
 					bool wrIgnorar = ( uIgnoraSombraInternaX > 0.5 && wrNLocal.x > 0.85 );
@@ -216,7 +244,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 							}
 						#endif
 
-						// Faces voltadas para baixo (sob W, sob perna do R, teto interno do furo do R)
+						// Faces voltadas para baixo (sob W, sob perna do R)
 						// ou contra a luz direcional (ombreira esquerda da janela, entalhe esquerdo do W)
 						if ( wrNWorld.y < -0.15 || dot( wrNWorld, uDirLuz ) < -0.05 ) {
 							wrEmSombra = 1.0;

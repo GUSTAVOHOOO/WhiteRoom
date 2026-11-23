@@ -27,6 +27,34 @@ export interface ConstrucaoPecas {
 const EPS = 0.004;
 const INSET_QUINA = 0.0008;
 const BORDA_INTERNA = 0.5 - ESPESSURA_PAREDE; // 0.365
+// Profundidade aparente medida no JPG para o batente interno do furo ("olho") do R:
+// ~112/1000 (vs 135/1000 das paredes externas), mantendo a espessura externa de 135 intacta.
+const PROFUNDIDADE_FURO_R = 0.112;
+const BORDA_TRAS_FURO_R = 0.5 - PROFUNDIDADE_FURO_R; // 0.388
+
+function pontoNoFuroInternoR(y: number, z: number): boolean {
+	return z >= -0.295 && z <= 0.295 && y >= 0.042 && y <= 0.320;
+}
+
+/**
+ * Recua apenas os vértices traseiros (`X = +0.365`) pertencentes ao furo interno do R
+ * para `X = +0.388` (profundidade 112/1000 medida no JPG), preservando a espessura
+ * real de 135/1000 em todo o perímetro externo da peça R e sem alterar `r.svg`.
+ */
+function ajustarProfundidadeFuroR(geom: THREE.BufferGeometry): void {
+	const pos = geom.getAttribute('position');
+	for (let i = 0; i < pos.count; i++) {
+		const x = pos.getX(i);
+		const y = pos.getY(i);
+		const z = pos.getZ(i);
+		if (perto(x, BORDA_INTERNA) && pontoNoFuroInternoR(y, z)) {
+			pos.setX(i, BORDA_TRAS_FURO_R);
+		}
+	}
+	pos.needsUpdate = true;
+	geom.computeBoundingBox();
+	geom.computeBoundingSphere();
+}
 
 /**
  * Pivôs e posições finais (em coordenadas do cubo [-0.5, +0.5]³) de cada peça,
@@ -199,6 +227,7 @@ export function criarPecasCubo(
 	// Corpo com rebaixo interno em Z <= +0.365 (não invade a coluna [865..1000]×[865..1000] do W)
 	const geomRCorpo = geomRCompleta.clone();
 	limitarEixoGeometria(geomRCorpo, 'z', 'max', BORDA_INTERNA);
+	ajustarProfundidadeFuroR(geomRCorpo);
 
 	// Lâmina frontal ocre cobrindo a quina Z ∈ [+0.365, +0.5] sem sobrepor o topo do W
 	const geomRLaminaQuina = new THREE.BoxGeometry(INSET_QUINA * 0.75, 1, ESPESSURA_PAREDE - INSET_QUINA);
@@ -269,6 +298,16 @@ export function criarPecasCubo(
 					return null;
 				}
 			}
+		}
+		// Ajusta as arestas traseiras do furo interno do R para a profundidade 112/1000
+		const aNoFuro = pontoNoFuroInternoR(a.y, a.z);
+		const bNoFuro = pontoNoFuroInternoR(b.y, b.z);
+		if (aNoFuro && bNoFuro && (perto(a.x, BORDA_INTERNA) || perto(b.x, BORDA_INTERNA))) {
+			const na = a.clone();
+			const nb = b.clone();
+			if (perto(na.x, BORDA_INTERNA)) na.x = BORDA_TRAS_FURO_R;
+			if (perto(nb.x, BORDA_INTERNA)) nb.x = BORDA_TRAS_FURO_R;
+			return [na, nb];
 		}
 		return [a, b];
 	};
