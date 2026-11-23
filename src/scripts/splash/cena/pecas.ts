@@ -32,8 +32,18 @@ const BORDA_INTERNA = 0.5 - ESPESSURA_PAREDE; // 0.365
 const PROFUNDIDADE_FURO_R = 0.112;
 const BORDA_TRAS_FURO_R = 0.5 - PROFUNDIDADE_FURO_R; // 0.388
 
+// Profundidade aparente medida no JPG para a face inferior da perna diagonal do R:
+// ~196/1000 (vs 135/1000 das paredes externas; ~19,9 px centro-a-centro / ~14,4 px cinza interno),
+// mantendo a espessura externa de 135 no restante da peça e sem alterar `r.svg`.
+const PROFUNDIDADE_PERNA_R = 0.196;
+const BORDA_TRAS_PERNA_R = 0.5 - PROFUNDIDADE_PERNA_R; // 0.304
+
 function pontoNoFuroInternoR(y: number, z: number): boolean {
 	return z >= -0.295 && z <= 0.295 && y >= 0.042 && y <= 0.320;
+}
+
+function pontoNaFaceInferiorPernaR(y: number, z: number): boolean {
+	return (perto(y, -0.126) && perto(z, -0.02)) || (perto(y, -0.5) && perto(z, -0.27));
 }
 
 /**
@@ -49,6 +59,27 @@ function ajustarProfundidadeFuroR(geom: THREE.BufferGeometry): void {
 		const z = pos.getZ(i);
 		if (perto(x, BORDA_INTERNA) && pontoNoFuroInternoR(y, z)) {
 			pos.setX(i, BORDA_TRAS_FURO_R);
+		}
+	}
+	pos.needsUpdate = true;
+	geom.computeBoundingBox();
+	geom.computeBoundingSphere();
+}
+
+/**
+ * Estende apenas os dois vértices traseiros (`X = +0.365`) da face inferior da perna
+ * diagonal do R (`(520, 626)` e `(770, 1000)` em `r.svg`) para `X = +0.304`
+ * (profundidade aparente 196/1000 medida no JPG), recuperando a largura perpendicular
+ * real (~14,4 px de face cinza) sem editar `r.svg` nem alterar o restante da parede.
+ */
+function ajustarProfundidadePernaR(geom: THREE.BufferGeometry): void {
+	const pos = geom.getAttribute('position');
+	for (let i = 0; i < pos.count; i++) {
+		const x = pos.getX(i);
+		const y = pos.getY(i);
+		const z = pos.getZ(i);
+		if (perto(x, BORDA_INTERNA) && pontoNaFaceInferiorPernaR(y, z)) {
+			pos.setX(i, BORDA_TRAS_PERNA_R);
 		}
 	}
 	pos.needsUpdate = true;
@@ -228,6 +259,7 @@ export function criarPecasCubo(
 	const geomRCorpo = geomRCompleta.clone();
 	limitarEixoGeometria(geomRCorpo, 'z', 'max', BORDA_INTERNA);
 	ajustarProfundidadeFuroR(geomRCorpo);
+	ajustarProfundidadePernaR(geomRCorpo);
 
 	// Lâmina frontal ocre cobrindo a quina Z ∈ [+0.365, +0.5] sem sobrepor o topo do W
 	const geomRLaminaQuina = new THREE.BoxGeometry(INSET_QUINA * 0.75, 1, ESPESSURA_PAREDE - INSET_QUINA);
@@ -307,6 +339,16 @@ export function criarPecasCubo(
 			const nb = b.clone();
 			if (perto(na.x, BORDA_INTERNA)) na.x = BORDA_TRAS_FURO_R;
 			if (perto(nb.x, BORDA_INTERNA)) nb.x = BORDA_TRAS_FURO_R;
+			return [na, nb];
+		}
+		// Estende os dois vértices traseiros da face inferior da perna do R para a profundidade 196/1000
+		const aNaPerna = pontoNaFaceInferiorPernaR(a.y, a.z);
+		const bNaPerna = pontoNaFaceInferiorPernaR(b.y, b.z);
+		if ((aNaPerna && perto(a.x, BORDA_INTERNA)) || (bNaPerna && perto(b.x, BORDA_INTERNA))) {
+			const na = a.clone();
+			const nb = b.clone();
+			if (aNaPerna && perto(na.x, BORDA_INTERNA)) na.x = BORDA_TRAS_PERNA_R;
+			if (bNaPerna && perto(nb.x, BORDA_INTERNA)) nb.x = BORDA_TRAS_PERNA_R;
 			return [na, nb];
 		}
 		return [a, b];

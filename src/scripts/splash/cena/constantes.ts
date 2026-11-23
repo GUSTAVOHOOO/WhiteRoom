@@ -80,6 +80,7 @@ export const CORES = {
 	topo: '#FFFFFF',
 	interna: '#EBEAE6',
 	sombra: '#C6C5C1',
+	sombraPernaR: '#B3B4AE',
 	contorno: '#171717',
 	linhaConstrucao: '#343432',
 } as const;

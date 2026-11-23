@@ -17,6 +17,7 @@ export interface UniformesMaterialChapado {
 	uCorTopo: { value: THREE.Color };
 	uCorInterna: { value: THREE.Color };
 	uCorSombra: { value: THREE.Color };
+	uCorSombraPernaR: { value: THREE.Color };
 	uDirLuz: { value: THREE.Vector3 };
 	uIgnoraSombraInternaX: { value: number };
 	uMascaraDireitaR: { value: number };
@@ -107,6 +108,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 		uCorTopo: { value: new THREE.Color(CORES.topo) },
 		uCorInterna: { value: new THREE.Color(CORES.interna) },
 		uCorSombra: { value: new THREE.Color(CORES.sombra) },
+		uCorSombraPernaR: { value: new THREE.Color(CORES.sombraPernaR) },
 		uDirLuz: { value: opcoes.direcaoLuz.clone().normalize() },
 		uIgnoraSombraInternaX: { value: opcoes.ignoraSombraInternaX ? 1.0 : 0.0 },
 		uMascaraDireitaR: { value: opcoes.mascaraDireitaR ? 1.0 : 0.0 },
@@ -158,6 +160,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 				uniform vec3 uCorTopo;
 				uniform vec3 uCorInterna;
 				uniform vec3 uCorSombra;
+				uniform vec3 uCorSombraPernaR;
 				uniform vec3 uDirLuz;
 				uniform float uIgnoraSombraInternaX;
 				uniform float uMascaraDireitaR;
@@ -213,6 +216,15 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 					float wrYCorte = 610.0 - 0.15 * ( 1000.0 - wrXmm );
 					float wrSombraFuro = ( wrNLocal.y < 0.72 && wrYmm > wrYCorte ) ? 1.0 : 0.0;
 					outgoingLight = mix( uCorInterna, uCorSombra, wrSombraFuro );
+				} else if (
+					uMascaraOmbroR > 0.5 &&
+					vWrLocalPos.y < -0.120 &&
+					wrNLocal.y < -0.2 &&
+					wrNLocal.z > 0.5
+				) {
+					// Face inferior em sombra sob a perna diagonal do R (#B3B4AE no JPG),
+					// preservando #C6C5C1 global nas demais sombras da cena
+					outgoingLight = uCorSombraPernaR;
 				} else if (
 					uMascaraDireitaR > 0.5 &&
 					vWrLocalPos.x > -0.165 &&

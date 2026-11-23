@@ -1,7 +1,7 @@
-# T2 — Estado do Gauntlet Loop (Passagem de Bastão → Rodada 4)
+# T2 — Estado do Gauntlet Loop (Rodada 4)
 
 Branch: `GUSTAVOHOOO/splash-t2-cubo` · Referência visual: `75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg` (`1024×1024`).
-Perfis SVG originais em `src/assets/logo/perfis/` estão **intactos** (nenhum SVG foi editado até a rodada 3).
+Perfis SVG originais em `src/assets/logo/perfis/` estão **intactos** (nenhum SVG foi editado até a rodada 4).
 
 ## 1. Arquitetura de `src/scripts/splash/cena/` e modos debug
 
@@ -45,6 +45,7 @@ node tools/gauntlet/t2-rodada.mjs <n>
 - **Regra "à direita do R"**: `wrEstaADireitaDoR` (GLSL em `materiais.ts` e versão TS em `contorno.ts`) projeta `fundo-direita` ortograficamente no plano `X = 1000` do R (`xR = X - Z`, `yR = 1000 - (Y + 0.93148*(1000 - X))`) e descarta malha/arestas que vazariam abaixo do topo à direita do bojo e da perna do R.
 - **Quina superior direita do R (R2)**: `r.svg` curva para baixo a partir de `x_svg = 660` (`Z = +0.16`). Para fechar o aro branco reto até `T_right`/`In_right` sem editar `r.svg`, `pecas.ts` adiciona `meshRTopoContinuo` (`PlaneGeometry` em `Y = +0.5`, `castShadow = false`) + 2 segmentos retos extras em `contornoR`, remove o arco traseiro `X = +0.365` do ombro em `transformarArestasR` e descarta a superfície curva saliente via `uMascaraOmbroR`.
 - **Furo interno ("olho") do R (R3)**: o JPG desenha o furo com profundidade aparente `112/1000` (vs `135/1000` externo). `ajustarProfundidadeFuroR` e `transformarArestasR` avançam só os vértices/arestas traseiros do furo de `X = +0.365` para `X = +0.388`. Em `materiais.ts`, o furo ignora a auto-sombra da barra superior do R (aplicando peitoril `#EBEAE6` limpo e corte diagonal `#C6C5C1` em `Y > 610 - 0.15*(1000 - X)`) e `fundo-direita` vista só através do furo (`X > 335, Y < 300`) usa o corte diagonal `Y < 196 - 0.212*(X - 363)`.
+- **Face inferior da perna diagonal do R (R4)**: medição 3× contra `docs/logo/retificado/r.png` e o JPG confirmou que `r.svg` já bate em `< 0,8 px` na face ocre da perna (largura ocre idêntica: `68–71 px` horizontais; o deslocamento de `+2–4 px` em `x` a `y` fixo é 100% efeito da altura aceita de `1,7%` do cubo perfeito), mas o JPG desenha a face inferior cinza da perna com profundidade aparente `196/1000` (`~19,9 px` centro-a-centro / `~14,4 px` cinza interno, vs `~8,4 px` com `135/1000`) e tom `#B3B4AE`. `ajustarProfundidadePernaR` e `transformarArestasR` estendem só os dois vértices traseiros dessa face (`(520, 626)` e `(770, 1000)`) para `X = +0.304`; `materiais.ts` aplica `CORES.sombraPernaR = '#B3B4AE'` exclusivamente nessa face (`uMascaraOmbroR > 0.5 && vWrLocalPos.y < -0.120 && wrNLocal.y < -0.2 && wrNLocal.z > 0.5`), preservando `#C6C5C1` global.
 - **Sombra dura em dois tons**: `WebGLRenderer` com `NoToneMapping` + `SRGBColorSpace` + `BasicShadowMap`. No `onBeforeCompile` de `materiais.ts`, `getShadow(...) < 0.5` ou `nWorld.y < -0.15` ou `dot(nWorld, uDirLuz) < -0.05` comuta direto para `#C6C5C1` (`fundo-esquerda` ignora auto-sombra em `nLocal.x > 0.85`).
 - **Contorno `LineSegments2`**: `LineMaterial` recebe bias de profundidade no vertex shader (`clip.z -= 0.0012 * clip.w`) + `polygonOffset(1, 1)` nas malhas para que cantos côncavos (`In_back`) não percam metade da largura do traço.
 - **Linhas de construção**: 12 `<line>` no `<svg>` atrás do canvas (extensão `0.223`, ápices `0.177`, cor `#343432`, largura `1.45 px`), mais 1 `LineSegments2` fina (`criarLinhaConstrucaoFrontalW`) no plano `Z = +0.5, Y = +0.5` cruzando o vão aberto do W.
@@ -56,11 +57,12 @@ node tools/gauntlet/t2-rodada.mjs <n>
 | 1 | `e9d80ed` | Cena 3D completa, `/?debug` + `/?debug=captura`, gates `tools/gauntlet/` | OK / OK / 0 err, 0 warn | `2,8996%` (30.404 px) | 6 (FAIL) |
 | 2 | `2b8d0c4` | Falha 1: aro branco reto contínuo até `T_right`/`In_right` e remoção do arco solto/extrusão curva no ombro do R | OK / OK / 0 err, 0 warn | `2,8628%` (30.019 px) | 7 (FAIL) |
 | 3 | `cb59fcb` | Falha 1: profundidade `112/1000` no furo do R, peitoril limpo, corte contínuo no teto curvo e triângulo diagonal em `fundo-direita` no vão | OK / OK / 0 err, 0 warn | `2,6222%` (27.496 px) | 8 (FAIL) |
+| 4 | *(este commit)* | Falha 1: profundidade aparente `196/1000` na face inferior da perna diagonal do R (`~14,5 px` cinza interno) e tom `#B3B4AE` isolado (`sombra_sob_r` `Δmax = 0`), sem editar `r.svg` | OK / OK / 0 err, 0 warn | `2,5846%` (27.101 px) | *(aguardando crítico)* |
 
-## 5. Lacunas abertas (`rodada-3/critica.md`) e armadilhas a evitar
+## 5. Lacunas abertas (remanescentes da `rodada-3/critica.md`) e armadilhas a evitar
 
-1. **Falha 1 (próxima prioridade na R4) — Perna diagonal do R (`x ≈ 610–735, y ≈ 595–680`)**: na referência, a forquilha ocre avança mais à esquerda (`x ≈ 624, y ≈ 603`), a face inferior em sombra tem `~14–16 px` de largura perpendicular e tom mais escuro `#B3B4AE` (no render: `x ≈ 633`, largura `~9–10 px`, cor `#C6C5C1`, `deltaEuclidiano = 31,8` no ponto `sombra_sob_r`). Conferir com zoom 3× no JPG quanto é diferença da base (`1,7%` de altura do cubo perfeito) vs. largura real da forquilha/chanfro em `r.svg` e tom `#B3B4AE`.
-2. **Falha 2 (depois) — Batente interno direito da porta (`x ≈ 415–443, y ≈ 398–525`)**: sombra diagonal do lintel divide o batente em `#C6C5C1` em cima e `#EBEAE6` embaixo; na referência é cinza contínuo uniforme `~#CECDC9`.
+1. ~~**Falha 1 (resolvida na R4) — Perna diagonal do R (`x ≈ 610–735, y ≈ 595–680`)**~~: resolvida via profundidade `196/1000` + `#B3B4AE` isolado na face inferior (`perna-r-antes-depois.png`, `0 px` alterados fora da perna, `sombra_sob_r` `Δmax = 0`, largura perpendicular `20,0 px` centro-a-centro / `~14,5 px` cinza interno vs `19,9 px` / `~14,4 px` no JPG). `r.svg` não precisa de ajuste na perna (erro `< 0,8 px` no retificado; o recuo de `~3 px` em `x` a `y` fixo é 100% da altura aceita de `1,7%`).
+2. **Falha 2 (próxima prioridade se mantida pelo crítico) — Batente interno direito da porta (`x ≈ 415–443, y ≈ 398–525`)**: sombra diagonal do lintel divide o batente em `#C6C5C1` em cima e `#EBEAE6` embaixo; na referência é cinza contínuo uniforme `~#CECDC9`.
 3. **Falha 3 (depois) — Dentes e espículas pretas nos contornos**: pequenos triângulos/protuberâncias em cantos (`(541, 761)`, `(715, 667)`, `(558, 523)`, `(634, 607)`, `(305, 354)`, `(542, 258)`, `(382, 432)`). **Causa provável**: arestas traseiras/ocultas das paredes (ou extremidades com round-cap de `LineSegments2`) vazando ligeiramente nos vértices devido ao bias `clip.z -= 0.0012 * clip.w` (`~0.024` u) em quinas agudas.
 
 **Armadilhas conhecidas:**
