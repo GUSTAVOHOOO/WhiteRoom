@@ -1,0 +1,203 @@
+{
+  "rodada": 6,
+  "timestamp": "2026-11-23T23:11:58.585Z",
+  "porta": 4403,
+  "dimensao": {
+    "largura": 1024,
+    "altura": 1024,
+    "dpr": 1
+  },
+  "astroCheck": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 10817,
+    "stdout": "\u001b[2m20:11:42\u001b[22m \u001b[34m[content]\u001b[39m Syncing content\n\u001b[33m\u001b[1m20:11:42\u001b[22m [WARN] [glob-loader]\u001b[39m No files found matching \"**/[^_]*.md\" in directory \"src\\content\\projetos\"\n\u001b[2m20:11:42\u001b[22m \u001b[34m[content]\u001b[39m Synced content\n\u001b[2m20:11:42\u001b[22m \u001b[34m[types]\u001b[39m Generated \u001b[2m859ms\u001b[22m\n\u001b[2m20:11:42\u001b[22m \u001b[34m[check]\u001b[39m Getting diagnostics for Astro files in C:\\Users\\Windows 11\\orca\\workspaces\\WhiteRoom\\splash-t2-cubo...\nResult (31 files): \n- 0 errors\n- 0 warnings\n- 0 hints",
+    "stderr": ""
+  },
+  "astroBuild": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 5001,
+    "stdout": "\u001b[2m20:11:52\u001b[22m \u001b[34m[content]\u001b[39m Syncing content\n\u001b[33m\u001b[1m20:11:52\u001b[22m [WARN] [glob-loader]\u001b[39m No files found matching \"**/[^_]*.md\" in directory \"src\\content\\projetos\"\n\u001b[2m20:11:52\u001b[22m \u001b[34m[content]\u001b[39m Synced content\n\u001b[2m20:11:52\u001b[22m \u001b[34m[types]\u001b[39m Generated \u001b[2m709ms\u001b[22m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m output: \u001b[34m\"static\"\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m mode: \u001b[34m\"static\"\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m directory: \u001b[34mC:\\Users\\Windows 11\\orca\\workspaces\\WhiteRoom\\splash-t2-cubo\\dist\\\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m Collecting build info...\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m \u001b[32m✓ Completed in 738ms.\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m Building static entrypoints...\n\u001b[2m20:11:52\u001b[22m \u001b[34m[vite]\u001b[39m \u001b[32m✓ built in 428ms\u001b[39m\n\u001b[33m\u001b[1m20:11:52\u001b[22m [WARN] [vite]\u001b[39m \u001b[33m[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[vite]\u001b[39m \u001b[32m✓ built in 253ms\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m Rearranging server assets...\n\n\u001b[42m\u001b[30m generating static routes \u001b[39m\u001b[49m\n\u001b[2m20:11:52\u001b[22m   \u001b[34m├─\u001b[39m \u001b[2m/prototipo-t1/index.html\u001b[22m \u001b[2m(+21ms)\u001b[22m \n\u001b[2m20:11:52\u001b[22m   \u001b[34m├─\u001b[39m \u001b[2m/index.html\u001b[22m\u001b[33m\u001b[1m20:11:52\u001b[22m [WARN] [content]\u001b[39m The collection \"projetos\" does not exist or is empty. Please check your content config file for errors.\n \u001b[2m(+15ms)\u001b[22m \n\u001b[2m20:11:52\u001b[22m \u001b[32m✓ Completed in 58ms.\n\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m \u001b[32m✓ Completed in 832ms.\u001b[39m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m 2 page(s) built in \u001b[1m1.58s\u001b[22m\n\u001b[2m20:11:52\u001b[22m \u001b[34m[build]\u001b[39m \u001b[1mComplete!\u001b[22m",
+    "stderr": ""
+  },
+  "captura": {
+    "ok": true,
+    "erro": null
+  },
+  "console": {
+    "totalErros": 0,
+    "totalAvisos": 0,
+    "erros": [],
+    "avisos": [],
+    "pageErrors": []
+  },
+  "diff": {
+    "limiar": 0.1,
+    "totalPixels": 1048576,
+    "pixelsDiferentes": 26542,
+    "porcentagem": 2.5312
+  },
+  "cores": [
+    {
+      "id": "fundo",
+      "descricao": "Fundo #FAFAF8 (canto superior esquerdo)",
+      "x": 100,
+      "y": 100,
+      "capturaHex": "#fafaf8",
+      "capturaRgb": [
+        250,
+        250,
+        248
+      ],
+      "referenciaHex": "#fbfbf9",
+      "referenciaRgb": [
+        251,
+        251,
+        249
+      ],
+      "deltaMaxCanal": 1,
+      "deltaEuclidiano": 1.73
+    },
+    {
+      "id": "face_w",
+      "descricao": "Centro da haste esquerda da face externa do W (#171717)",
+      "x": 295,
+      "y": 550,
+      "capturaHex": "#171717",
+      "capturaRgb": [
+        23,
+        23,
+        23
+      ],
+      "referenciaHex": "#171715",
+      "referenciaRgb": [
+        23,
+        23,
+        21
+      ],
+      "deltaMaxCanal": 2,
+      "deltaEuclidiano": 2
+    },
+    {
+      "id": "face_r",
+      "descricao": "Centro da haste vertical da face externa do R (#CD9016)",
+      "x": 540,
+      "y": 600,
+      "capturaHex": "#cd9016",
+      "capturaRgb": [
+        205,
+        144,
+        22
+      ],
+      "referenciaHex": "#cd8f17",
+      "referenciaRgb": [
+        205,
+        143,
+        23
+      ],
+      "deltaMaxCanal": 1,
+      "deltaEuclidiano": 1.41
+    },
+    {
+      "id": "topo_branco",
+      "descricao": "Topo branco da parede fundo-esquerda (#FFFFFF)",
+      "x": 392,
+      "y": 321,
+      "capturaHex": "#ffffff",
+      "capturaRgb": [
+        255,
+        255,
+        255
+      ],
+      "referenciaHex": "#fefbfa",
+      "referenciaRgb": [
+        254,
+        251,
+        250
+      ],
+      "deltaMaxCanal": 5,
+      "deltaEuclidiano": 6.48
+    },
+    {
+      "id": "face_interna",
+      "descricao": "Parede interna fundo-esquerda iluminada (#EBEAE6)",
+      "x": 455,
+      "y": 345,
+      "capturaHex": "#ebeae6",
+      "capturaRgb": [
+        235,
+        234,
+        230
+      ],
+      "referenciaHex": "#eae9e5",
+      "referenciaRgb": [
+        234,
+        233,
+        229
+      ],
+      "deltaMaxCanal": 1,
+      "deltaEuclidiano": 1.73
+    },
+    {
+      "id": "cunha_sombra",
+      "descricao": "Cunha de sombra na parede fundo-direita (#C6C5C1)",
+      "x": 525,
+      "y": 380,
+      "capturaHex": "#c6c5c1",
+      "capturaRgb": [
+        198,
+        197,
+        193
+      ],
+      "referenciaHex": "#c8c7c3",
+      "referenciaRgb": [
+        200,
+        199,
+        195
+      ],
+      "deltaMaxCanal": 2,
+      "deltaEuclidiano": 3.46
+    },
+    {
+      "id": "sombra_sob_r",
+      "descricao": "Face inferior em sombra sob a perna diagonal do R",
+      "x": 646,
+      "y": 637,
+      "capturaHex": "#b3b4ae",
+      "capturaRgb": [
+        179,
+        180,
+        174
+      ],
+      "referenciaHex": "#b3b4ae",
+      "referenciaRgb": [
+        179,
+        180,
+        174
+      ],
+      "deltaMaxCanal": 0,
+      "deltaEuclidiano": 0
+    },
+    {
+      "id": "interior_furo_r",
+      "descricao": "Espessura horizontal iluminada no furo interno do R",
+      "x": 610,
+      "y": 520,
+      "capturaHex": "#ebeae6",
+      "capturaRgb": [
+        235,
+        234,
+        230
+      ],
+      "referenciaHex": "#ecebe7",
+      "referenciaRgb": [
+        236,
+        235,
+        231
+      ],
+      "deltaMaxCanal": 1,
+      "deltaEuclidiano": 1.73
+    }
+  ]
+}
