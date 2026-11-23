@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import type { AlvoHeader, AnimacaoSplash, CriarAnimacao } from './contrato';
-import { LOGO_PROVISORIA } from './logo';
+import { LOGO_PROVISORIA_DATA_URI } from './logo';
 
 interface EstadoDesenho {
 	x: number;
@@ -29,7 +29,7 @@ export const criarAnimacao: CriarAnimacao = async (
 		throw new Error('Contexto 2D indisponível no canvas do stub');
 	}
 
-	const imagem = await carregarImagem(LOGO_PROVISORIA.src);
+	const imagem = await carregarImagem(LOGO_PROVISORIA_DATA_URI);
 
 	let destruida = false;
 	let emVoo = false;

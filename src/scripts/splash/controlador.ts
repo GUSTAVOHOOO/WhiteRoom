@@ -1,9 +1,16 @@
 import gsap from 'gsap';
 import type { AlvoHeader, AnimacaoSplash, CriarAnimacao } from './contrato';
 
+declare global {
+	interface Window {
+		__wrSplashIniciada?: boolean;
+	}
+}
+
 const TIMEOUT_3D_MS = 800;
 const ATRASO_LENTO_MS = 1500;
 const ESPERA_REDUZIDA_MS = 600;
+const TETO_ABSOLUTO_MS = 8000;
 const FADE_REDUZIDA_S = 0.3;
 const VOO_FALLBACK_S = 0.5;
 const VOO_PULAR_S = 0.3;
@@ -51,6 +58,8 @@ async function carregar3D(
 }
 
 export function iniciarSplash(): void {
+	window.__wrSplashIniciada = true;
+
 	const root = document.documentElement;
 	const overlayEl = document.querySelector<HTMLElement>('[data-splash-overlay]');
 
@@ -79,6 +88,7 @@ export function iniciarSplash(): void {
 	let animacao3D: AnimacaoSplash | null = null;
 	let timerTimeout3D: number | null = null;
 	let timerReduzida: number | null = null;
+	let timerTeto: number | null = null;
 	let tweenFallbackLogo: gsap.core.Tween | null = null;
 	let tweenFallbackFundo: gsap.core.Tween | null = null;
 	let tweenReduzida: gsap.core.Tween | null = null;
@@ -95,6 +105,10 @@ export function iniciarSplash(): void {
 		if (timerReduzida !== null) {
 			window.clearTimeout(timerReduzida);
 			timerReduzida = null;
+		}
+		if (timerTeto !== null) {
+			window.clearTimeout(timerTeto);
+			timerTeto = null;
 		}
 	};
 
@@ -278,6 +292,12 @@ export function iniciarSplash(): void {
 	window.addEventListener('pointerdown', onPointerDown);
 	window.addEventListener('keydown', onKeyDown);
 	window.addEventListener('resize', onResize);
+
+	// Teto absoluto: garante que a splash nunca trava a página
+	timerTeto = window.setTimeout(() => {
+		timerTeto = null;
+		finalizar();
+	}, TETO_ABSOLUTO_MS);
 
 	// Modo movimento reduzido: logo parada ~600 ms + fade ~300 ms, sem voo
 	if (reduzida) {

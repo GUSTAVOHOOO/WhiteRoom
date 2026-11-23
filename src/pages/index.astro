@@ -48,6 +48,12 @@ const projetos = (await getCollection('projetos')).sort((a, b) => a.data.ordem -
 			) {
 				root.classList.add('splash-reduzida');
 			}
+
+			window.setTimeout(() => {
+				if (window.__wrSplashIniciada !== true) {
+					root.classList.remove('splash-ativa', 'splash-reduzida');
+				}
+			}, 3000);
 		})();
 	</script>
 

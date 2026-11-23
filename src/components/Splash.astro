@@ -1,5 +1,5 @@
 ---
-import { LOGO_PROVISORIA } from '../scripts/splash/logo';
+import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
 ---
 
 <div
@@ -9,16 +9,12 @@ import { LOGO_PROVISORIA } from '../scripts/splash/logo';
 	class="fixed inset-0 z-9999 select-none"
 >
 	<div data-splash-fundo class="absolute inset-0 bg-papel"></div>
-	<img
-		src={LOGO_PROVISORIA.src}
-		width={LOGO_PROVISORIA.width}
-		height={LOGO_PROVISORIA.height}
-		alt=""
+	<div
 		data-splash-logo
-		class="pointer-events-none relative z-10 block h-[55vmin] w-[55vmin] object-contain will-change-transform"
-		decoding="sync"
-		loading="eager"
-	/>
+		class="pointer-events-none relative z-10 block h-[55vmin] w-[55vmin] will-change-transform [&>svg]:h-full [&>svg]:w-full"
+	>
+		<Fragment set:html={LOGO_PROVISORIA_SVG} />
+	</div>
 	<canvas
 		data-splash-canvas
 		class="pointer-events-none absolute inset-0 z-20 block h-full w-full opacity-0"
