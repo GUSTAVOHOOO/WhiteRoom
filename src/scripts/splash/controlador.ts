@@ -83,11 +83,11 @@ export function iniciarSplash(): void {
 	if (paramsDebug.has('debug')) {
 		const linhasEl = document.querySelector<SVGSVGElement>('[data-splash-linhas]');
 		if (!linhasEl) return;
-		const modoCaptura = paramsDebug.get('debug') === 'captura';
+		const modoDebug = paramsDebug.get('debug') ?? '';
 		void import('./cena/debug').then(({ iniciarModoDebug }) => {
 			iniciarModoDebug(
 				{ overlayEl, fundoEl, logoEl, canvasEl, linhasEl },
-				modoCaptura,
+				modoDebug,
 			);
 		});
 		return;
