@@ -1,0 +1,550 @@
+---
+import wSvg from '../assets/logo/perfis/w.svg?raw';
+import rSvg from '../assets/logo/perfis/r.svg?raw';
+import feSvg from '../assets/logo/perfis/fundo-esquerda.svg?raw';
+import fdSvg from '../assets/logo/perfis/fundo-direita.svg?raw';
+import refJpg from '../../75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg';
+
+function extractPathD(svgRaw: string): string {
+	const match = svgRaw.match(/d="([^"]+)"/);
+	if (!match) throw new Error('SVG sem atributo d em <path>');
+	return match[1];
+}
+
+const perfis = [
+	{
+		id: 'w',
+		titulo: 'W — Parede frontal esquerda',
+		arquivo: 'w.svg',
+		vista: 'Vista de fora (plano Z = 1000)',
+		cor: '#dc2626',
+		d: extractPathD(wSvg),
+		matrix: '0.239320 0.131510 0.000000 0.287490 272.150000 368.980000',
+	},
+	{
+		id: 'r',
+		titulo: 'R — Parede frontal direita',
+		arquivo: 'r.svg',
+		vista: 'Vista de fora (plano X = 1000)',
+		cor: '#2563eb',
+		d: extractPathD(rSvg),
+		matrix: '0.239300 -0.131760 0.000000 0.287490 511.470000 500.490000',
+	},
+	{
+		id: 'fundo-esquerda',
+		titulo: 'Fundo-esquerda — Quarto branco',
+		arquivo: 'fundo-esquerda.svg',
+		vista: 'Vista de dentro (plano X = 135)',
+		cor: '#059669',
+		d: extractPathD(feSvg),
+		matrix: '0.239300 -0.131760 0.000000 0.287490 304.458200 386.733850',
+	},
+	{
+		id: 'fundo-direita',
+		titulo: 'Fundo-direita — Quarto branco',
+		arquivo: 'fundo-direita.svg',
+		vista: 'Vista de dentro (plano Z = 135)',
+		cor: '#9333ea',
+		d: extractPathD(fdSvg),
+		matrix: '0.239320 0.131510 0.000000 0.287490 479.144500 255.007600',
+	},
+] as const;
+
+const ordemIso = [perfis[2], perfis[3], perfis[0], perfis[1]];
+const gridLines = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+---
+
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Protótipo T1 — Conferência dos Perfis Planos SVG</title>
+		<style>
+			:root {
+				color-scheme: light;
+				--bg: #f6f6f4;
+				--card: #ffffff;
+				--ink: #171717;
+				--muted: #525252;
+				--border: #d4d4d0;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				padding: 24px;
+				font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+				background: var(--bg);
+				color: var(--ink);
+				line-height: 1.45;
+			}
+			main {
+				max-width: 1360px;
+				margin: 0 auto;
+				display: grid;
+				gap: 28px;
+			}
+			header h1 {
+				margin: 0 0 6px;
+				font-size: 1.45rem;
+				letter-spacing: -0.02em;
+			}
+			header p {
+				margin: 0;
+				color: var(--muted);
+				font-size: 0.92rem;
+			}
+			section {
+				background: var(--card);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 20px;
+			}
+			section h2 {
+				margin: 0 0 4px;
+				font-size: 1.1rem;
+			}
+			.sub {
+				margin: 0 0 16px;
+				color: var(--muted);
+				font-size: 0.85rem;
+			}
+
+			/* Grade dos 4 perfis planos */
+			.perfis-grid {
+				display: grid;
+				grid-template-columns: repeat(4, minmax(0, 1fr));
+				gap: 16px;
+			}
+			@media (max-width: 1024px) {
+				.perfis-grid {
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+				}
+			}
+			@media (max-width: 560px) {
+				.perfis-grid {
+					grid-template-columns: 1fr;
+				}
+			}
+			.perfil-card {
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 12px;
+				background: #fff;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+			}
+			.perfil-card h3 {
+				margin: 0;
+				font-size: 0.9rem;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.dot {
+				width: 10px;
+				height: 10px;
+				border-radius: 50%;
+				flex: none;
+			}
+			.perfil-meta {
+				font-size: 0.76rem;
+				color: var(--muted);
+				margin: 0;
+			}
+			.flat-svg {
+				width: 100%;
+				height: auto;
+				display: block;
+				background: #ffffff;
+				border: 1px solid #e5e5e5;
+			}
+
+			/* Conferência isométrica */
+			.iso-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) 310px;
+				gap: 20px;
+				align-items: start;
+			}
+			@media (max-width: 960px) {
+				.iso-layout {
+					grid-template-columns: 1fr;
+				}
+			}
+			.iso-stage {
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				background: #fafaf8;
+				overflow: hidden;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+			}
+			.iso-svg {
+				width: 100%;
+				max-width: 760px;
+				aspect-ratio: 1 / 1;
+				display: block;
+			}
+			.controls {
+				display: grid;
+				gap: 16px;
+				font-size: 0.88rem;
+			}
+			.control-group {
+				border: 1px solid #e5e5e0;
+				border-radius: 8px;
+				padding: 12px;
+				display: grid;
+				gap: 10px;
+			}
+			.control-group h3 {
+				margin: 0;
+				font-size: 0.85rem;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--muted);
+			}
+			.slider-row {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+			.slider-row input[type='range'] {
+				flex: 1;
+			}
+			.mono {
+				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+				font-size: 0.8rem;
+			}
+			.toggle-list {
+				display: grid;
+				gap: 6px;
+			}
+			.toggle-item {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				cursor: pointer;
+				user-select: none;
+			}
+			.btn-row {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+			}
+			button {
+				appearance: none;
+				border: 1px solid var(--border);
+				background: #fafaf8;
+				color: var(--ink);
+				padding: 6px 10px;
+				border-radius: 6px;
+				font-size: 0.8rem;
+				cursor: pointer;
+			}
+			button:hover {
+				background: #ecece8;
+			}
+			button.active {
+				background: var(--ink);
+				color: #ffffff;
+				border-color: var(--ink);
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.82rem;
+			}
+			th,
+			td {
+				text-align: left;
+				padding: 8px 10px;
+				border-bottom: 1px solid #e5e5e0;
+			}
+			th {
+				color: var(--muted);
+				font-weight: 600;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<header>
+				<h1>Protótipo T1 — Perfis Planos SVG da Logo WhiteRoom</h1>
+				<p>
+					Conferência geométrica pura (HTML/SVG, sem Three.js). Lado do cubo = 1000 u · Espessura adotada = 135 u (13,5%) ·
+					Referência: <code>75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg</code>
+				</p>
+			</header>
+
+			<section aria-labelledby="sec-planos">
+				<h2 id="sec-planos">1. Perfis planos de frente (viewBox 0 0 1000 1000, grade 100×100)</h2>
+				<p class="sub">
+					Preenchimento preto sólido (<code>fill-rule="evenodd"</code>) sobre fundo branco. Grade vermelha = eixos externos do cubo
+					(0 e 1000); linhas cinza = subdivisões de 100 em 100.
+				</p>
+				<div class="perfis-grid">
+					{
+						perfis.map((p) => (
+							<article class="perfil-card">
+								<h3>
+									<span class="dot" style={`background:${p.cor}`} />
+									{p.titulo}
+								</h3>
+								<p class="perfil-meta">
+									<code>{p.arquivo}</code> · {p.vista}
+								</p>
+								<svg
+									class="flat-svg"
+									viewBox="-70 -55 1110 1100"
+									role="img"
+									aria-label={`Perfil plano ${p.arquivo}`}
+								>
+									{/* Fundo branco da face */}
+									<rect x="0" y="0" width="1000" height="1000" fill="#ffffff" />
+
+									{/* Perfil sólido preto */}
+									<path fill-rule="evenodd" d={p.d} fill="#111111" />
+
+									{/* Grade de 100 em 100 */}
+									<g pointer-events="none">
+										{gridLines.map((v) => {
+											const isEdge = v === 0 || v === 1000;
+											const isMid = v === 500;
+											const stroke = isEdge
+												? '#dc2626'
+												: isMid
+													? 'rgba(37, 99, 235, 0.55)'
+													: 'rgba(120, 120, 120, 0.45)';
+											const sw = isEdge ? 4 : isMid ? 2.5 : 1.5;
+											return (
+												<>
+													<line x1={v} y1="0" x2={v} y2="1000" stroke={stroke} stroke-width={sw} />
+													<line x1="0" y1={v} x2="1000" y2={v} stroke={stroke} stroke-width={sw} />
+													{v % 200 === 0 && (
+														<>
+															<text
+																x={v}
+																y="-16"
+																text-anchor="middle"
+																font-size="30"
+																font-family="monospace"
+																fill="#525252"
+															>
+																{v}
+															</text>
+															<text
+																x="-12"
+																y={v + 10}
+																text-anchor="end"
+																font-size="30"
+																font-family="monospace"
+																fill="#525252"
+															>
+																{v}
+															</text>
+														</>
+													)}
+												</>
+											);
+										})}
+									</g>
+								</svg>
+							</article>
+						))
+					}
+				</div>
+			</section>
+
+			<section aria-labelledby="sec-iso">
+				<h2 id="sec-iso">2. Re-projeção isométrica sobre o JPG de referência</h2>
+				<p class="sub">
+					Cada perfil plano é projetado por <code>transform="matrix(a b c d e f)"</code> diretamente sobre o JPG original
+					(1024×1024). Use o slider de opacidade e os botões de zoom para conferir o encaixe de cada recorte.
+				</p>
+
+				<div class="iso-layout">
+					<div class="iso-stage">
+						<svg
+							id="iso-svg"
+							class="iso-svg"
+							viewBox="180 180 664 664"
+							xmlns="http://www.w3.org/2000/svg"
+							role="img"
+							aria-label="Overlay isométrico dos 4 perfis sobre o JPG original"
+						>
+							<image href={refJpg.src} x="0" y="0" width="1024" height="1024" />
+
+							<g id="iso-overlay" opacity="0.5">
+								{
+									ordemIso.map((p) => (
+										<path
+											data-layer={p.id}
+											fill-rule="evenodd"
+											d={p.d}
+											transform={`matrix(${p.matrix})`}
+											fill={p.cor}
+											stroke={p.cor}
+											stroke-width="2.2"
+											vector-effect="non-scaling-stroke"
+										/>
+									))
+								}
+							</g>
+						</svg>
+					</div>
+
+					<aside class="controls">
+						<div class="control-group">
+							<h3>Opacidade do overlay</h3>
+							<div class="slider-row">
+								<input id="opacity-slider" type="range" min="0" max="100" value="50" />
+								<span id="opacity-value" class="mono">50%</span>
+							</div>
+							<label class="toggle-item">
+								<input id="outline-only" type="checkbox" />
+								<span>Somente contorno (sem preenchimento)</span>
+							</label>
+						</div>
+
+						<div class="control-group">
+							<h3>Camadas visíveis</h3>
+							<div class="toggle-list">
+								{
+									perfis.map((p) => (
+										<label class="toggle-item">
+											<input type="checkbox" checked data-toggle={p.id} />
+											<span class="dot" style={`background:${p.cor}`} />
+											<span>{p.titulo}</span>
+										</label>
+									))
+								}
+							</div>
+						</div>
+
+						<div class="control-group">
+							<h3>Zoom de conferência</h3>
+							<div class="btn-row" id="zoom-buttons">
+								<button type="button" class="active" data-vb="180 180 664 664">Cubo inteiro</button>
+								<button type="button" data-vb="240 345 310 465">Zoom W</button>
+								<button type="button" data-vb="485 345 300 465">Zoom R</button>
+								<button type="button" data-vb="260 225 320 430">Zoom Fundo-E</button>
+								<button type="button" data-vb="445 225 330 370">Zoom Fundo-D</button>
+								<button type="button" data-vb="0 0 1024 1024">JPG 1024px</button>
+							</div>
+						</div>
+					</aside>
+				</div>
+			</section>
+
+			<section aria-labelledby="sec-matrizes">
+				<h2 id="sec-matrizes">3. Matrizes afins aplicadas</h2>
+				<table>
+					<thead>
+						<tr>
+							<th>Peça</th>
+							<th>Plano 3D</th>
+							<th>SVG <code>matrix(a b c d e f)</code></th>
+						</tr>
+					</thead>
+					<tbody>
+						{
+							perfis.map((p) => (
+								<tr>
+									<td>
+										<strong>{p.arquivo}</strong>
+									</td>
+									<td>{p.vista}</td>
+									<td class="mono">matrix({p.matrix})</td>
+								</tr>
+							))
+						}
+					</tbody>
+				</table>
+			</section>
+		</main>
+
+		<script>
+			const svg = document.getElementById('iso-svg') as SVGSVGElement | null;
+			const overlay = document.getElementById('iso-overlay') as SVGGElement | null;
+			const slider = document.getElementById('opacity-slider') as HTMLInputElement | null;
+			const valueLabel = document.getElementById('opacity-value');
+			const outlineOnly = document.getElementById('outline-only') as HTMLInputElement | null;
+
+			function updateOpacity() {
+				if (!slider || !overlay || !valueLabel) return;
+				const pct = Number(slider.value);
+				overlay.setAttribute('opacity', String(pct / 100));
+				valueLabel.textContent = `${pct}%`;
+			}
+
+			function updateOutline() {
+				if (!outlineOnly || !overlay) return;
+				const paths = overlay.querySelectorAll<SVGPathElement>('path[data-layer]');
+				for (const path of paths) {
+					const color = path.getAttribute('stroke') ?? '#000';
+					path.setAttribute('fill', outlineOnly.checked ? 'none' : color);
+					path.setAttribute('stroke-width', outlineOnly.checked ? '2.8' : '2.2');
+				}
+			}
+
+			slider?.addEventListener('input', updateOpacity);
+			outlineOnly?.addEventListener('change', updateOutline);
+
+			document.querySelectorAll<HTMLInputElement>('input[data-toggle]').forEach((input) => {
+				input.addEventListener('change', () => {
+					const id = input.dataset.toggle;
+					const layer = overlay?.querySelector<SVGPathElement>(`path[data-layer="${id}"]`);
+					if (layer) layer.style.display = input.checked ? '' : 'none';
+				});
+			});
+
+			const zoomButtons = document.querySelectorAll<HTMLButtonElement>('#zoom-buttons button[data-vb]');
+			zoomButtons.forEach((btn) => {
+				btn.addEventListener('click', () => {
+					const vb = btn.dataset.vb;
+					if (svg && vb) svg.setAttribute('viewBox', vb);
+					zoomButtons.forEach((b) => b.classList.toggle('active', b === btn));
+				});
+			});
+
+			// Suporte a query params para capturas reprodutíveis (?opacidade=50&zoom=w&camadas=w)
+			const params = new URLSearchParams(window.location.search);
+			if (params.has('opacidade') && slider) {
+				slider.value = params.get('opacidade') ?? '50';
+				updateOpacity();
+			}
+			if (params.get('contorno') === '1' && outlineOnly) {
+				outlineOnly.checked = true;
+				updateOutline();
+			}
+			if (params.has('camadas')) {
+				const allowed = new Set((params.get('camadas') ?? '').split(',').filter(Boolean));
+				document.querySelectorAll<HTMLInputElement>('input[data-toggle]').forEach((input) => {
+					const id = input.dataset.toggle ?? '';
+					input.checked = allowed.has(id);
+					const layer = overlay?.querySelector<SVGPathElement>(`path[data-layer="${id}"]`);
+					if (layer) layer.style.display = input.checked ? '' : 'none';
+				});
+			}
+			const zoomMap: Record<string, string> = {
+				cubo: '180 180 664 664',
+				w: '240 345 310 465',
+				r: '485 345 300 465',
+				'fundo-esquerda': '260 225 320 430',
+				'fundo-direita': '445 225 330 370',
+				full: '0 0 1024 1024',
+			};
+			const zoomKey = params.get('zoom');
+			if (zoomKey && zoomMap[zoomKey] && svg) {
+				svg.setAttribute('viewBox', zoomMap[zoomKey]);
+				zoomButtons.forEach((b) => b.classList.toggle('active', b.dataset.vb === zoomMap[zoomKey]));
+			}
+		</script>
+	</body>
+</html>
