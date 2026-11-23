@@ -17,14 +17,14 @@ import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
 	>
 		<Fragment set:html={LOGO_PROVISORIA_SVG} />
 	</div>
-	<svg
-		data-splash-linhas
-		class="pointer-events-none absolute inset-0 z-[15] hidden h-full w-full"
-	></svg>
 	<canvas
 		data-splash-canvas
 		class="pointer-events-none absolute inset-0 z-20 block h-full w-full opacity-0"
 	></canvas>
+	<svg
+		data-splash-linhas
+		class="pointer-events-none absolute inset-0 z-30 hidden h-full w-full"
+	></svg>
 </div>
 
 <script>

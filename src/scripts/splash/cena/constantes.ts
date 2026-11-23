@@ -90,6 +90,7 @@ export const ESPESSURA_CONTORNO_1024_PX = 5.5;
 export const ESPESSURA_LINHA_CONSTRUCAO_1024_PX = 1.45;
 export const LIMIAR_ARESTAS_GRAUS = 25;
 export const SEGMENTOS_CURVA_R = 64;
+export const SEGMENTOS_CURVA_R_HLR = 32;
 
 /**
  * Direção da luz direcional fixa (apontando DO cubo PARA a fonte de luz).

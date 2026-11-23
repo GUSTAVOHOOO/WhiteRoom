@@ -31,7 +31,9 @@ export function criarLinhasHLR(
 	const direcaoVisao = new THREE.Vector3();
 	camera.getWorldDirection(direcaoVisao).negate().normalize();
 
-	const grupos = [pecas.quarto, pecas.w, pecas.r];
+	// Ordem R → quarto → W para que arestas exatas em X = +0.5 do R ancorem a deduplicação
+	// antes do recuo de 0,0008 u da quina do W
+	const grupos = [pecas.r, pecas.quarto, pecas.w];
 	const malhas: DadosMalhaHlr[] = [];
 	let proxId = 0;
 

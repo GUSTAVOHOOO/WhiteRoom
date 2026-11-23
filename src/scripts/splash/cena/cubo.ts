@@ -1,15 +1,10 @@
 import * as THREE from 'three';
 import { atualizarEnquadramentoCamera, criarCameraCubo } from './camera';
-import {
-	atualizarLarguraContornos,
-	criarLinhaConstrucaoFrontalW,
-	criarMaterialContorno,
-	criarMaterialLinhaFrente,
-} from './contorno';
-import { criarLinhasConstrucaoSvg } from './linhas-construcao';
+import { criarLinhasHLR, type LinhasHLR } from './linhas';
 import { criarLuzCena } from './luz';
 import { criarPecasCubo, type PecasCubo } from './pecas';
 
+export type { LinhasHLR } from './linhas';
 export type { PecasCubo } from './pecas';
 
 export interface CenaCubo {
@@ -17,6 +12,7 @@ export interface CenaCubo {
 	scene: THREE.Scene;
 	camera: THREE.OrthographicCamera;
 	pecas: PecasCubo;
+	linhas: LinhasHLR;
 	renderizar: () => void;
 	redimensionar: (largura: number, altura: number, dpr?: number) => void;
 	destruir: () => void;
@@ -44,26 +40,19 @@ export function criarCena(canvas: HTMLCanvasElement, svgLinhas: SVGSVGElement): 
 	scene.add(luz.direcional);
 	scene.add(luz.direcional.target);
 
-	const materialContorno = criarMaterialContorno();
-	const materialLinhaFrente = criarMaterialLinhaFrente();
-
-	const construcao = criarPecasCubo(luz.direcaoNormalizada, materialContorno);
+	const construcao = criarPecasCubo(luz.direcaoNormalizada);
 	scene.add(construcao.pecas.quarto);
 	scene.add(construcao.pecas.w);
 	scene.add(construcao.pecas.r);
 
-	// Linha de construção frontal superior (T_left -> T_front) que cruza o vão aberto do W
-	const linhaFrenteW = criarLinhaConstrucaoFrontalW(materialLinhaFrente);
-	linhaFrenteW.name = 'linha-construcao-frontal-w';
-	scene.add(linhaFrenteW);
-
-	const linhasSvg = criarLinhasConstrucaoSvg(svgLinhas);
+	const linhas = criarLinhasHLR(construcao.pecas, camera, svgLinhas);
 
 	let destruida = false;
 
 	const renderizar = (): void => {
 		if (destruida) return;
 		renderer.render(scene, camera);
+		linhas.atualizar();
 	};
 
 	const redimensionar = (largura: number, altura: number, dpr?: number): void => {
@@ -76,8 +65,7 @@ export function criarCena(canvas: HTMLCanvasElement, svgLinhas: SVGSVGElement): 
 		renderer.setSize(w, h, false);
 
 		atualizarEnquadramentoCamera(camera, w, h);
-		atualizarLarguraContornos(construcao.materiaisContorno, materialLinhaFrente, w, h);
-		linhasSvg.atualizarProjecao(camera, w, h);
+		linhas.definirDimensoes(w, h);
 		renderizar();
 	};
 
@@ -85,12 +73,7 @@ export function criarCena(canvas: HTMLCanvasElement, svgLinhas: SVGSVGElement): 
 		if (destruida) return;
 		destruida = true;
 
-		linhasSvg.destruir();
-		linhaFrenteW.geometry.dispose();
-		materialLinhaFrente.dispose();
-		for (const mat of construcao.materiaisContorno) {
-			mat.dispose();
-		}
+		linhas.destruir();
 		for (const geom of construcao.descartaveis.geometrias) {
 			geom.dispose();
 		}
@@ -105,6 +88,7 @@ export function criarCena(canvas: HTMLCanvasElement, svgLinhas: SVGSVGElement): 
 		scene,
 		camera,
 		pecas: construcao.pecas,
+		linhas,
 		renderizar,
 		redimensionar,
 		destruir,

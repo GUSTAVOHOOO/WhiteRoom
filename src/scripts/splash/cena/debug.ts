@@ -69,7 +69,7 @@ export function iniciarModoDebug(
 	imgRef.style.left = '50%';
 	imgRef.style.transform = 'translate(-50%, -50%)';
 	imgRef.style.pointerEvents = 'none';
-	imgRef.style.zIndex = '30';
+	imgRef.style.zIndex = '40';
 	imgRef.style.opacity = '0';
 	overlayEl.appendChild(imgRef);
 

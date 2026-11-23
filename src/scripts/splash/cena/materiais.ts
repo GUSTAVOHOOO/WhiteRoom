@@ -120,9 +120,6 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 
 	const material = new THREE.MeshLambertMaterial({
 		color: 0xffffff,
-		polygonOffset: true,
-		polygonOffsetFactor: 1,
-		polygonOffsetUnits: 1,
 	});
 
 	const chaveCache = `wr-chapado-${opcoes.corExterna ?? 'quarto'}-${opcoes.ignoraSombraInternaX ? 1 : 0}-${opcoes.mascaraDireitaR ? 1 : 0}-${opcoes.mascaraOmbroR ? 1 : 0}`;

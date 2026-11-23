@@ -1,12 +1,17 @@
 import * as THREE from 'three';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import fundoDireitaSvgRaw from '../../../assets/logo/perfis/fundo-direita.svg?raw';
 import fundoEsquerdaSvgRaw from '../../../assets/logo/perfis/fundo-esquerda.svg?raw';
 import rSvgRaw from '../../../assets/logo/perfis/r.svg?raw';
 import wSvgRaw from '../../../assets/logo/perfis/w.svg?raw';
-import { CORES, ESCALA_SVG, ESPESSURA_PAREDE, SEGMENTOS_CURVA_R } from './constantes';
-import { criarContornoGeometria, type TransformarSegmento } from './contorno';
+import {
+	CORES,
+	ESCALA_SVG,
+	ESPESSURA_PAREDE,
+	SEGMENTOS_CURVA_R,
+	SEGMENTOS_CURVA_R_HLR,
+} from './constantes';
+import type { MetadadosMalhaHlr } from './linhas';
 import { criarMaterialChapado } from './materiais';
 
 export interface PecasCubo {
@@ -17,7 +22,6 @@ export interface PecasCubo {
 
 export interface ConstrucaoPecas {
 	pecas: PecasCubo;
-	materiaisContorno: LineMaterial[];
 	descartaveis: {
 		geometrias: THREE.BufferGeometry[];
 		materiais: THREE.Material[];
@@ -27,6 +31,7 @@ export interface ConstrucaoPecas {
 const EPS = 0.004;
 const INSET_QUINA = 0.0008;
 const BORDA_INTERNA = 0.5 - ESPESSURA_PAREDE; // 0.365
+
 // Profundidade aparente medida no JPG para o batente interno do furo ("olho") do R:
 // ~112/1000 (vs 135/1000 das paredes externas), mantendo a espessura externa de 135 intacta.
 const PROFUNDIDADE_FURO_R = 0.112;
@@ -44,8 +49,12 @@ const BORDA_TRAS_PERNA_R = 0.5 - PROFUNDIDADE_PERNA_R; // 0.304
 const PROFUNDIDADE_PORTA_FE = 0.07;
 const BORDA_TRAS_PORTA_FE = -BORDA_INTERNA - PROFUNDIDADE_PORTA_FE; // -0.435
 
+function perto(a: number, b: number): boolean {
+	return Math.abs(a - b) <= EPS;
+}
+
 function pontoNoFuroInternoR(y: number, z: number): boolean {
-	return z >= -0.295 && z <= 0.295 && y >= 0.042 && y <= 0.320;
+	return z >= -0.295 && z <= 0.295 && y >= 0.042 && y <= 0.32;
 }
 
 function pontoNaFaceInferiorPernaR(y: number, z: number): boolean {
@@ -56,11 +65,6 @@ function pontoNaPortaFE(y: number, z: number): boolean {
 	return y <= 0.18 && z >= -0.11 && z <= 0.16;
 }
 
-/**
- * Recua apenas os vértices traseiros (`X = +0.365`) pertencentes ao furo interno do R
- * para `X = +0.388` (profundidade 112/1000 medida no JPG), preservando a espessura
- * real de 135/1000 em todo o perímetro externo da peça R e sem alterar `r.svg`.
- */
 function ajustarProfundidadeFuroR(geom: THREE.BufferGeometry): void {
 	const pos = geom.getAttribute('position');
 	for (let i = 0; i < pos.count; i++) {
@@ -76,12 +80,6 @@ function ajustarProfundidadeFuroR(geom: THREE.BufferGeometry): void {
 	geom.computeBoundingSphere();
 }
 
-/**
- * Estende apenas os dois vértices traseiros (`X = +0.365`) da face inferior da perna
- * diagonal do R (`(520, 626)` e `(770, 1000)` em `r.svg`) para `X = +0.304`
- * (profundidade aparente 196/1000 medida no JPG), recuperando a largura perpendicular
- * real (~14,4 px de face cinza) sem editar `r.svg` nem alterar o restante da parede.
- */
 function ajustarProfundidadePernaR(geom: THREE.BufferGeometry): void {
 	const pos = geom.getAttribute('position');
 	for (let i = 0; i < pos.count; i++) {
@@ -97,11 +95,6 @@ function ajustarProfundidadePernaR(geom: THREE.BufferGeometry): void {
 	geom.computeBoundingSphere();
 }
 
-/**
- * Avança apenas os vértices traseiros (`X = -0.5`) da abertura da porta em `fundo-esquerda`
- * para `X = -0.435` (profundidade aparente 70/1000 medida no JPG), preservando a espessura
- * de 135/1000 no topo e bordas externas da parede e sem alterar `fundo-esquerda.svg`.
- */
 function ajustarProfundidadePortaFE(geom: THREE.BufferGeometry): void {
 	const pos = geom.getAttribute('position');
 	for (let i = 0; i < pos.count; i++) {
@@ -178,35 +171,188 @@ function limitarEixoGeometria(
 	geom.computeBoundingSphere();
 }
 
-function perto(a: number, b: number): boolean {
-	return Math.abs(a - b) <= EPS;
+interface VerticeTri {
+	px: number;
+	py: number;
+	pz: number;
+	nx: number;
+	ny: number;
+	nz: number;
+	u: number;
+	v: number;
 }
 
-function recortarSegmentoNoIntervalo(
-	a: THREE.Vector3,
-	b: THREE.Vector3,
+function interpolarVertice(
+	a: VerticeTri,
+	b: VerticeTri,
+	t: number,
 	eixo: 'x' | 'z',
-	minVal: number,
-	maxVal: number,
-): [THREE.Vector3, THREE.Vector3] | null {
-	const va = eixo === 'x' ? a.x : a.z;
-	const vb = eixo === 'x' ? b.x : b.z;
-	const lo = Math.min(va, vb);
-	const hi = Math.max(va, vb);
-	const cLo = Math.max(lo, minVal);
-	const cHi = Math.min(hi, maxVal);
-	if (cHi - cLo <= 1e-5) return null;
+	valorExato: number,
+): VerticeTri {
+	const px = eixo === 'x' ? valorExato : a.px + (b.px - a.px) * t;
+	const py = a.py + (b.py - a.py) * t;
+	const pz = eixo === 'z' ? valorExato : a.pz + (b.pz - a.pz) * t;
+	return {
+		px,
+		py,
+		pz,
+		nx: a.nx + (b.nx - a.nx) * t,
+		ny: a.ny + (b.ny - a.ny) * t,
+		nz: a.nz + (b.nz - a.nz) * t,
+		u: a.u + (b.u - a.u) * t,
+		v: a.v + (b.v - a.v) * t,
+	};
+}
 
-	const na = a.clone();
-	const nb = b.clone();
-	if (eixo === 'x') {
-		na.x = va <= vb ? cLo : cHi;
-		nb.x = va <= vb ? cHi : cLo;
-	} else {
-		na.z = va <= vb ? cLo : cHi;
-		nb.z = va <= vb ? cHi : cLo;
+/**
+ * Subdivide todos os triângulos da geometria que cruzam o plano `eixo = valor`,
+ * preservando a malha 100% manifold/fechada (sem T-junctions entre o topo branco
+ * e as paredes laterais nem entre topos de peças vizinhas — confirmado em F0.2).
+ */
+function dividirGeometriaEmPlano(
+	geom: THREE.BufferGeometry,
+	eixo: 'x' | 'z',
+	valor: number,
+): THREE.BufferGeometry {
+	const base = geom.index ? geom.toNonIndexed() : geom;
+	const pos = base.getAttribute('position');
+	const norm = base.getAttribute('normal');
+	const uv = base.getAttribute('uv');
+	const temUv = uv !== undefined;
+
+	const outPos: number[] = [];
+	const outNorm: number[] = [];
+	const outUv: number[] = [];
+
+	const emitir = (a: VerticeTri, b: VerticeTri, c: VerticeTri): void => {
+		outPos.push(a.px, a.py, a.pz, b.px, b.py, b.pz, c.px, c.py, c.pz);
+		outNorm.push(a.nx, a.ny, a.nz, b.nx, b.ny, b.nz, c.nx, c.ny, c.nz);
+		if (temUv) {
+			outUv.push(a.u, a.v, b.u, b.v, c.u, c.v);
+		}
+	};
+
+	const lerVert = (idx: number): VerticeTri => ({
+		px: pos.getX(idx),
+		py: pos.getY(idx),
+		pz: pos.getZ(idx),
+		nx: norm.getX(idx),
+		ny: norm.getY(idx),
+		nz: norm.getZ(idx),
+		u: temUv ? uv.getX(idx) : 0,
+		v: temUv ? uv.getY(idx) : 0,
+	});
+
+	const coord = (vt: VerticeTri): number => (eixo === 'x' ? vt.px : vt.pz);
+	const tol = 1e-5;
+
+	for (let i = 0; i < pos.count; i += 3) {
+		const v0 = lerVert(i);
+		const v1 = lerVert(i + 1);
+		const v2 = lerVert(i + 2);
+
+		const d0 = coord(v0) - valor;
+		const d1 = coord(v1) - valor;
+		const d2 = coord(v2) - valor;
+
+		const s0 = Math.abs(d0) <= tol ? 0 : d0 > 0 ? 1 : -1;
+		const s1 = Math.abs(d1) <= tol ? 0 : d1 > 0 ? 1 : -1;
+		const s2 = Math.abs(d2) <= tol ? 0 : d2 > 0 ? 1 : -1;
+
+		const temPos = s0 > 0 || s1 > 0 || s2 > 0;
+		const temNeg = s0 < 0 || s1 < 0 || s2 < 0;
+
+		if (!temPos || !temNeg) {
+			emitir(v0, v1, v2);
+			continue;
+		}
+
+		// Caso 1: exatamente um vértice sobre o plano e dois em lados opostos
+		if (s0 === 0 || s1 === 0 || s2 === 0) {
+			let a: VerticeTri;
+			let b: VerticeTri;
+			let c: VerticeTri;
+			let db: number;
+			let dc: number;
+			if (s0 === 0) {
+				a = v0;
+				b = v1;
+				c = v2;
+				db = d1;
+				dc = d2;
+			} else if (s1 === 0) {
+				a = v1;
+				b = v2;
+				c = v0;
+				db = d2;
+				dc = d0;
+			} else {
+				a = v2;
+				b = v0;
+				c = v1;
+				db = d0;
+				dc = d1;
+			}
+			const p = interpolarVertice(b, c, db / (db - dc), eixo, valor);
+			emitir(a, b, p);
+			emitir(a, p, c);
+			continue;
+		}
+
+		// Caso 2: um vértice isolado de um lado e dois do outro (preserva orientação cíclica)
+		let a: VerticeTri;
+		let b: VerticeTri;
+		let c: VerticeTri;
+		let da: number;
+		let db: number;
+		let dc: number;
+		if (s0 !== s1 && s0 !== s2) {
+			a = v0;
+			b = v1;
+			c = v2;
+			da = d0;
+			db = d1;
+			dc = d2;
+		} else if (s1 !== s0 && s1 !== s2) {
+			a = v1;
+			b = v2;
+			c = v0;
+			da = d1;
+			db = d2;
+			dc = d0;
+		} else {
+			a = v2;
+			b = v0;
+			c = v1;
+			da = d2;
+			db = d0;
+			dc = d1;
+		}
+		const p = interpolarVertice(a, b, da / (da - db), eixo, valor);
+		const q = interpolarVertice(a, c, da / (da - dc), eixo, valor);
+		emitir(a, p, q);
+		emitir(p, b, c);
+		emitir(p, c, q);
 	}
-	return [na, nb];
+
+	const nova = new THREE.BufferGeometry();
+	nova.setAttribute('position', new THREE.Float32BufferAttribute(outPos, 3));
+	nova.setAttribute('normal', new THREE.Float32BufferAttribute(outNorm, 3));
+	if (temUv) {
+		nova.setAttribute('uv', new THREE.Float32BufferAttribute(outUv, 2));
+	}
+	nova.computeBoundingBox();
+	nova.computeBoundingSphere();
+
+	if (base !== geom) {
+		base.dispose();
+	}
+	geom.dispose();
+	return nova;
+}
+
+function definirHlr(malha: THREE.Mesh, meta: MetadadosMalhaHlr): void {
+	malha.userData.hlr = meta;
 }
 
 function envolverEmPivo(
@@ -229,20 +375,19 @@ function envolverEmPivo(
 	return grupo;
 }
 
-export function criarPecasCubo(
-	direcaoLuz: THREE.Vector3,
-	materialContorno: LineMaterial,
-): ConstrucaoPecas {
+export function criarPecasCubo(direcaoLuz: THREE.Vector3): ConstrucaoPecas {
 	const geometrias: THREE.BufferGeometry[] = [];
 	const materiais: THREE.Material[] = [];
 
 	// --- 1. Peça W (parede frontal esquerda, Z: +0.5 -> +0.365, inclui coluna da quina da frente) ---
-	const geomW = extrudarPerfilBase(wSvgRaw, 12);
+	let geomW = extrudarPerfilBase(wSvgRaw, 12);
 	geomW.translate(-0.5, 0.5, 0.5);
-	const geomWContorno = geomW.clone();
 	// Recua 0,0008 na face X = +0.5 para não haver z-fighting com a face ocre do R
 	limitarEixoGeometria(geomW, 'x', 'max', 0.5 - INSET_QUINA);
-	geometrias.push(geomW, geomWContorno);
+	// Alinha vértices do topo branco nas emendas com fundo-esquerda (X = -0.365) e R (X = +0.365)
+	geomW = dividirGeometriaEmPlano(geomW, 'x', -BORDA_INTERNA);
+	geomW = dividirGeometriaEmPlano(geomW, 'x', BORDA_INTERNA);
+	geometrias.push(geomW);
 
 	const matW = criarMaterialChapado({
 		corExterna: CORES.wExterna,
@@ -256,48 +401,40 @@ export function criarPecasCubo(
 	meshW.castShadow = true;
 	meshW.receiveShadow = true;
 
-	const transformarArestasW: TransformarSegmento = (a, b) => {
-		// Remove emendas internas coplanares no topo branco (encontros com fundo-esquerda e R)
-		if (perto(a.y, 0.5) && perto(b.y, 0.5) && perto(a.z, BORDA_INTERNA) && perto(b.z, BORDA_INTERNA)) {
-			return recortarSegmentoNoIntervalo(a, b, 'x', -BORDA_INTERNA, BORDA_INTERNA);
-		}
-		// Remove aresta vertical traseira da quina (X = +0.5, Z = +0.365) que fica
-		// coplanar atrás da face externa ocre do R
-		if (perto(a.x, 0.5) && perto(b.x, 0.5) && perto(a.z, BORDA_INTERNA) && perto(b.z, BORDA_INTERNA)) {
-			return null;
-		}
-		// Remove aresta inferior na face X = +0.5 oculta atrás da haste do R
-		if (perto(a.x, 0.5) && perto(b.x, 0.5) && perto(a.y, -0.5) && perto(b.y, -0.5)) {
-			return null;
-		}
-		return [a, b];
-	};
-	const contornoW = criarContornoGeometria(geomWContorno, materialContorno, {
-		transformar: transformarArestasW,
-	});
-	contornoW.name = 'contorno-w';
-	geometrias.push(contornoW.geometry);
-
-	const grupoW = envolverEmPivo('peca-w', POSICOES_FINAIS.w, [meshW, contornoW]);
+	const grupoW = envolverEmPivo('peca-w', POSICOES_FINAIS.w, [meshW]);
 
 	// --- 2. Peça R (parede frontal direita, X: +0.5 -> +0.365, rebaixo interno na coluna da quina do W) ---
-	const geomRCompleta = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R);
-	geomRCompleta.rotateY(Math.PI / 2);
-	geomRCompleta.translate(0.5, 0.5, 0.5);
-
-	// Corpo com rebaixo interno em Z <= +0.365 (não invade a coluna [865..1000]×[865..1000] do W)
-	const geomRCorpo = geomRCompleta.clone();
+	const geomRCorpo = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R);
+	geomRCorpo.rotateY(Math.PI / 2);
+	geomRCorpo.translate(0.5, 0.5, 0.5);
 	limitarEixoGeometria(geomRCorpo, 'z', 'max', BORDA_INTERNA);
 	ajustarProfundidadeFuroR(geomRCorpo);
 	ajustarProfundidadePernaR(geomRCorpo);
 
+	// Versão simplificada das curvas do R exclusiva para o HLR (32 segmentos, sagita ≈ 0,025 px)
+	const geomRCorpoHlr = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R_HLR);
+	geomRCorpoHlr.rotateY(Math.PI / 2);
+	geomRCorpoHlr.translate(0.5, 0.5, 0.5);
+	limitarEixoGeometria(geomRCorpoHlr, 'z', 'max', BORDA_INTERNA);
+	ajustarProfundidadeFuroR(geomRCorpoHlr);
+	ajustarProfundidadePernaR(geomRCorpoHlr);
+
 	// Lâmina frontal ocre cobrindo a quina Z ∈ [+0.365, +0.5] sem sobrepor o topo do W
-	const geomRLaminaQuina = new THREE.BoxGeometry(INSET_QUINA * 0.75, 1, ESPESSURA_PAREDE - INSET_QUINA);
+	const geomRLaminaQuina = new THREE.BoxGeometry(
+		INSET_QUINA * 0.75,
+		1,
+		ESPESSURA_PAREDE - INSET_QUINA,
+	);
 	geomRLaminaQuina.translate(
 		0.5 - (INSET_QUINA * 0.75) / 2,
 		0,
 		BORDA_INTERNA + (ESPESSURA_PAREDE - INSET_QUINA) / 2,
 	);
+
+	// Quad frontal limpo da lâmina em X = +0.5 para o HLR (evita bordas finas de 0,0006 u)
+	const geomRLaminaHlr = new THREE.PlaneGeometry(ESPESSURA_PAREDE, 1);
+	geomRLaminaHlr.rotateY(Math.PI / 2);
+	geomRLaminaHlr.translate(0.5, 0, BORDA_INTERNA + ESPESSURA_PAREDE / 2);
 
 	// Faixa reta contínua do topo branco acima do ombro curvo do R (Z ∈ [-0.365, +0.16], Y = +0.5),
 	// fechando o aro superior até In_right e T_right sem bloquear o triângulo aberto sob a aresta reta
@@ -310,7 +447,8 @@ export function criarPecasCubo(
 		0.5,
 		(-BORDA_INTERNA + zInicioCurvaR) / 2,
 	);
-	geometrias.push(geomRCompleta, geomRCorpo, geomRLaminaQuina, geomRTopoContinuo);
+
+	geometrias.push(geomRCorpo, geomRCorpoHlr, geomRLaminaQuina, geomRLaminaHlr, geomRTopoContinuo);
 
 	const matR = criarMaterialChapado({
 		corExterna: CORES.rExterna,
@@ -324,96 +462,35 @@ export function criarPecasCubo(
 	meshRCorpo.name = 'malha-r-corpo';
 	meshRCorpo.castShadow = true;
 	meshRCorpo.receiveShadow = true;
+	definirHlr(meshRCorpo, { geometria: geomRCorpoHlr, mascara: 'ombroR' });
 
 	const meshRLamina = new THREE.Mesh(geomRLaminaQuina, matR);
 	meshRLamina.name = 'malha-r-quina';
 	meshRLamina.castShadow = true;
 	meshRLamina.receiveShadow = true;
+	definirHlr(meshRLamina, { geometria: geomRLaminaHlr });
 
 	const meshRTopoContinuo = new THREE.Mesh(geomRTopoContinuo, matR);
 	meshRTopoContinuo.name = 'malha-r-topo-continuo';
 	meshRTopoContinuo.castShadow = false;
 	meshRTopoContinuo.receiveShadow = false;
 
-	const transformarArestasR: TransformarSegmento = (a, b) => {
-		if (perto(a.y, 0.5) && perto(b.y, 0.5)) {
-			// Remove emenda interna na quina frontal (Z > +0.365) sobre o topo do W
-			if (perto(a.x, BORDA_INTERNA) && perto(b.x, BORDA_INTERNA)) {
-				return recortarSegmentoNoIntervalo(a, b, 'z', -0.5, BORDA_INTERNA);
-			}
-			// A borda externa frontal em Z = +0.5 já pertence ao topo do W
-			if (perto(a.z, 0.5) && perto(b.z, 0.5)) {
-				return null;
-			}
-		}
-		// Remove o arco traseiro (X = +0.365) do ombro superior direito do R
-		// (que projetaria um arco preto solto dentro do aro branco superior),
-		// preservando integralmente o contorno interno do furo do R
-		if (perto(a.x, BORDA_INTERNA) && perto(b.x, BORDA_INTERNA)) {
-			const mz = (a.z + b.z) * 0.5;
-			const my = (a.y + b.y) * 0.5;
-			const xSvg = (0.5 - mz) * 1000;
-			const ySvg = (0.5 - my) * 1000;
-			if (xSvg >= 658 && ySvg <= 340) {
-				const rElipse = Math.hypot((xSvg - 660) / 340, (ySvg - 336) / 336);
-				if (rElipse > 0.85) {
-					return null;
-				}
-			}
-		}
-		// Ajusta as arestas traseiras do furo interno do R para a profundidade 112/1000
-		const aNoFuro = pontoNoFuroInternoR(a.y, a.z);
-		const bNoFuro = pontoNoFuroInternoR(b.y, b.z);
-		if (aNoFuro && bNoFuro && (perto(a.x, BORDA_INTERNA) || perto(b.x, BORDA_INTERNA))) {
-			const na = a.clone();
-			const nb = b.clone();
-			if (perto(na.x, BORDA_INTERNA)) na.x = BORDA_TRAS_FURO_R;
-			if (perto(nb.x, BORDA_INTERNA)) nb.x = BORDA_TRAS_FURO_R;
-			return [na, nb];
-		}
-		// Estende os dois vértices traseiros da face inferior da perna do R para a profundidade 196/1000
-		const aNaPerna = pontoNaFaceInferiorPernaR(a.y, a.z);
-		const bNaPerna = pontoNaFaceInferiorPernaR(b.y, b.z);
-		if ((aNaPerna && perto(a.x, BORDA_INTERNA)) || (bNaPerna && perto(b.x, BORDA_INTERNA))) {
-			const na = a.clone();
-			const nb = b.clone();
-			if (aNaPerna && perto(na.x, BORDA_INTERNA)) na.x = BORDA_TRAS_PERNA_R;
-			if (bNaPerna && perto(nb.x, BORDA_INTERNA)) nb.x = BORDA_TRAS_PERNA_R;
-			return [na, nb];
-		}
-		return [a, b];
-	};
-	const contornoR = criarContornoGeometria(geomRCompleta, materialContorno, {
-		transformar: transformarArestasR,
-		segmentosExtras: [
-			// Continuação reta da aresta externa superior (T_front -> T_right) sobre o ombro do R
-			[new THREE.Vector3(0.5, 0.5, zInicioCurvaR), new THREE.Vector3(0.5, 0.5, -BORDA_INTERNA)],
-			// Continuação reta da aresta interna superior até fechar a quina limpa em In_right
-			[
-				new THREE.Vector3(BORDA_INTERNA, 0.5, zInicioCurvaR),
-				new THREE.Vector3(BORDA_INTERNA, 0.5, -BORDA_INTERNA),
-			],
-		],
-	});
-	contornoR.name = 'contorno-r';
-	geometrias.push(contornoR.geometry);
-
 	const grupoR = envolverEmPivo('peca-r', POSICOES_FINAIS.r, [
 		meshRCorpo,
 		meshRLamina,
 		meshRTopoContinuo,
-		contornoR,
 	]);
 
 	// --- 3. Peça Quarto Branco (fundo-esquerda + fundo-direita) ---
 	// 3a. fundo-esquerda: X ∈ [-0.5, -0.365], Z ∈ [-0.5, +0.365] (recua da quina do W)
-	const geomFE = extrudarPerfilBase(fundoEsquerdaSvgRaw, 8);
+	let geomFE = extrudarPerfilBase(fundoEsquerdaSvgRaw, 8);
 	geomFE.rotateY(Math.PI / 2);
 	geomFE.translate(-BORDA_INTERNA, 0.5, 0.5);
 	limitarEixoGeometria(geomFE, 'z', 'max', BORDA_INTERNA);
-	const geomFEContorno = geomFE.clone();
 	ajustarProfundidadePortaFE(geomFE);
-	geometrias.push(geomFE, geomFEContorno);
+	// Alinha vértices do topo branco na emenda com fundo-direita (Z = -0.365)
+	geomFE = dividirGeometriaEmPlano(geomFE, 'z', -BORDA_INTERNA);
+	geometrias.push(geomFE);
 
 	const matFE = criarMaterialChapado({
 		ignoraSombraInternaX: true,
@@ -425,53 +502,27 @@ export function criarPecasCubo(
 	meshFE.name = 'malha-fundo-esquerda';
 	meshFE.castShadow = true;
 	meshFE.receiveShadow = true;
-
-	const transformarArestasFE: TransformarSegmento = (a, b) => {
-		if (perto(a.y, 0.5) && perto(b.y, 0.5)) {
-			// Emenda com W em Z = +0.365
-			if (perto(a.z, BORDA_INTERNA) && perto(b.z, BORDA_INTERNA)) {
-				return null;
-			}
-			// Emenda com fundo-direita na quina traseira (Z < -0.365)
-			if (perto(a.x, -BORDA_INTERNA) && perto(b.x, -BORDA_INTERNA)) {
-				return recortarSegmentoNoIntervalo(a, b, 'z', -BORDA_INTERNA, BORDA_INTERNA);
-			}
-		}
-		// Ajusta as arestas traseiras da abertura da porta para a profundidade aparente 70/1000
-		const aNaPorta = pontoNaPortaFE(a.y, a.z);
-		const bNaPorta = pontoNaPortaFE(b.y, b.z);
-		if ((aNaPorta && perto(a.x, -0.5)) || (bNaPorta && perto(b.x, -0.5))) {
-			const na = a.clone();
-			const nb = b.clone();
-			if (aNaPorta && perto(na.x, -0.5)) na.x = BORDA_TRAS_PORTA_FE;
-			if (bNaPorta && perto(nb.x, -0.5)) nb.x = BORDA_TRAS_PORTA_FE;
-			return [na, nb];
-		}
-		return [a, b];
-	};
-	const contornoFE = criarContornoGeometria(geomFEContorno, materialContorno, {
-		transformar: transformarArestasFE,
-		segmentosExtras: [
-			// Fechamento inferior/soleira visível na fresta à direita do batente da porta (y ≈ 533 px)
+	// Preserva o fechamento inferior/soleira visível na fresta à direita da porta (rodada 5)
+	definirHlr(meshFE, {
+		arestasExtras: [
 			[
 				new THREE.Vector3(-BORDA_INTERNA, -0.31, -0.105),
 				new THREE.Vector3(-BORDA_INTERNA, -0.31, -0.165),
 			],
 		],
 	});
-	contornoFE.name = 'contorno-fundo-esquerda';
-	geometrias.push(contornoFE.geometry);
 
 	// 3b. fundo-direita: Z ∈ [-0.5, -0.365], X ∈ [-0.365, +0.5] (recua da quina traseira)
 	// Aplica máscara "à direita do R" para esconder malha e arestas que o 3D mostraria
 	// por trás dos recortes vazios à direita do bojo e da perna do R (regra do plano).
-	const geomFD = extrudarPerfilBase(fundoDireitaSvgRaw, 8);
+	let geomFD = extrudarPerfilBase(fundoDireitaSvgRaw, 8);
 	geomFD.translate(-0.5, 0.5, -BORDA_INTERNA);
 	limitarEixoGeometria(geomFD, 'x', 'min', -BORDA_INTERNA);
-	const geomFDContorno = geomFD.clone();
 	// Recua 0,0008 em X = +0.5 para não haver z-fighting atrás da face externa ocre do R
 	limitarEixoGeometria(geomFD, 'x', 'max', 0.5 - INSET_QUINA);
-	geometrias.push(geomFD, geomFDContorno);
+	// Alinha vértices do topo branco na emenda com o aro do R (X = +0.365)
+	geomFD = dividirGeometriaEmPlano(geomFD, 'x', BORDA_INTERNA);
+	geometrias.push(geomFD);
 
 	const matFD = criarMaterialChapado({
 		mascaraDireitaR: true,
@@ -483,38 +534,9 @@ export function criarPecasCubo(
 	meshFD.name = 'malha-fundo-direita';
 	meshFD.castShadow = true;
 	meshFD.receiveShadow = true;
+	definirHlr(meshFD, { mascara: 'direitaR' });
 
-	const transformarArestasFD: TransformarSegmento = (a, b) => {
-		if (perto(a.y, 0.5) && perto(b.y, 0.5)) {
-			// Emenda com fundo-esquerda em X = -0.365
-			if (perto(a.x, -BORDA_INTERNA) && perto(b.x, -BORDA_INTERNA)) {
-				return null;
-			}
-			// Emenda interna com a parede R no topo direito (X > +0.365, Z = -0.365)
-			if (perto(a.z, -BORDA_INTERNA) && perto(b.z, -BORDA_INTERNA)) {
-				return recortarSegmentoNoIntervalo(a, b, 'x', -BORDA_INTERNA, BORDA_INTERNA);
-			}
-		}
-		// Remove arestas na face lateral X = +0.5 (exceto a borda superior Y = +0.5 que fecha T_right)
-		// que ficariam coplanares atrás da face externa ocre do R
-		if (perto(a.x, 0.5) && perto(b.x, 0.5) && !(perto(a.y, 0.5) && perto(b.y, 0.5))) {
-			return null;
-		}
-		return [a, b];
-	};
-	const contornoFD = criarContornoGeometria(geomFDContorno, materialContorno, {
-		transformar: transformarArestasFD,
-		recortarDireitaR: true,
-	});
-	contornoFD.name = 'contorno-fundo-direita';
-	geometrias.push(contornoFD.geometry);
-
-	const grupoQuarto = envolverEmPivo('peca-quarto', POSICOES_FINAIS.quarto, [
-		meshFE,
-		contornoFE,
-		meshFD,
-		contornoFD,
-	]);
+	const grupoQuarto = envolverEmPivo('peca-quarto', POSICOES_FINAIS.quarto, [meshFE, meshFD]);
 
 	return {
 		pecas: {
@@ -522,7 +544,6 @@ export function criarPecasCubo(
 			r: grupoR,
 			quarto: grupoQuarto,
 		},
-		materiaisContorno: [materialContorno],
 		descartaveis: {
 			geometrias,
 			materiais,
