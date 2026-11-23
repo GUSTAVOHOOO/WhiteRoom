@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+/* Cores da marca: viram classes como bg-carbono, text-ocre */
+@theme {
+	--color-carbono: #171717;
+	--color-ocre: #cd9016; /* em aberto: a prancha diz #C38816 */
+	--color-papel: #fafaf8;
+	--color-parede: #ebeae6;
+	--color-sombra: #c6c5c1;
+}

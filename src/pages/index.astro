@@ -1,0 +1,28 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+
+const projetos = (await getCollection('projetos')).sort((a, b) => a.data.ordem - b.data.ordem);
+---
+
+<Base titulo="WhiteRoom Software House" descricao="Portfólio da WhiteRoom Software House.">
+	<main class="mx-auto max-w-5xl px-6 py-24">
+		<h1 class="text-5xl font-bold">WhiteRoom</h1>
+		<p class="mt-2 text-ocre">Software House</p>
+
+		<ul class="mt-16 grid gap-8 sm:grid-cols-2">
+			{
+				projetos.map(({ data }) => (
+					<li>
+						<a href={data.link} target="_blank" rel="noopener">
+							<Image src={data.capa} alt={data.capaAlt} widths={[480, 960]} sizes="(min-width: 640px) 50vw, 100vw" />
+							<h2 class="mt-4 text-xl font-semibold">{data.titulo}</h2>
+						</a>
+						<p>{data.resumo}</p>
+					</li>
+				))
+			}
+		</ul>
+	</main>
+</Base>
