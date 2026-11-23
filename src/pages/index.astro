@@ -20,7 +20,8 @@ const projetos = (await getCollection('projetos')).sort((a, b) => a.data.ordem -
 
 			const lento = flags.includes('lento');
 			const falha = flags.includes('falha');
-			const forcar = flags.includes('forcar') || lento || falha;
+			const travado = flags.includes('travado');
+			const forcar = flags.includes('forcar') || lento || falha || travado;
 
 			let vista = false;
 			if (!forcar) {

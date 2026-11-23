@@ -106,10 +106,6 @@ export function iniciarSplash(): void {
 			window.clearTimeout(timerReduzida);
 			timerReduzida = null;
 		}
-		if (timerTeto !== null) {
-			window.clearTimeout(timerTeto);
-			timerTeto = null;
-		}
 	};
 
 	const finalizar = (): void => {
@@ -117,6 +113,10 @@ export function iniciarSplash(): void {
 		finalizada = true;
 
 		limparTimers();
+		if (timerTeto !== null) {
+			window.clearTimeout(timerTeto);
+			timerTeto = null;
+		}
 
 		tweenFallbackLogo?.kill();
 		tweenFallbackFundo?.kill();

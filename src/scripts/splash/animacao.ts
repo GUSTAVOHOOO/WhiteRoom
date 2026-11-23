@@ -20,6 +20,15 @@ function carregarImagem(src: string): Promise<HTMLImageElement> {
 	});
 }
 
+function estaTravadoPorTeste(): boolean {
+	const params = new URLSearchParams(window.location.search);
+	const bruto = params.get('splash') ?? '';
+	return bruto
+		.split(',')
+		.map((item) => item.trim().toLowerCase())
+		.includes('travado');
+}
+
 export const criarAnimacao: CriarAnimacao = async (
 	canvas: HTMLCanvasElement,
 	alvo: () => AlvoHeader,
@@ -137,6 +146,15 @@ export const criarAnimacao: CriarAnimacao = async (
 		duracao: 2.3,
 
 		tocar(): Promise<void> {
+			if (estaTravadoPorTeste()) {
+				estado.escala = 1;
+				estado.opacidade = 1;
+				desenhar();
+				return new Promise<void>(() => {
+					// Simula 3D travado (?splash=travado): nunca resolve
+				});
+			}
+
 			const p = garantirPromessa();
 			if (destruida) {
 				concluir();
