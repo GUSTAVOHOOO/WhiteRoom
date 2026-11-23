@@ -53,7 +53,7 @@ export function pontoEstaADireitaDoR(p: THREE.Vector3): boolean {
 	const xR = X - Z;
 	const yR = 1000 - (Y + RAZAO_PROJECAO_Y_SOBRE_X * (1000 - X));
 
-	if (yR <= 1.5) return false;
+	if (yR <= 0.5) return false;
 
 	if (yR <= 336) {
 		if (xR <= 660) return false;
@@ -188,6 +188,7 @@ export function criarContornoGeometria(
 	opcoes?: {
 		transformar?: TransformarSegmento;
 		recortarDireitaR?: boolean;
+		segmentosExtras?: ReadonlyArray<readonly [THREE.Vector3, THREE.Vector3]>;
 	},
 ): LineSegments2 {
 	const edges = new THREE.EdgesGeometry(geometria, LIMIAR_ARESTAS_GRAUS);
@@ -219,6 +220,12 @@ export function criarContornoGeometria(
 	}
 
 	edges.dispose();
+
+	if (opcoes?.segmentosExtras) {
+		for (const [ea, eb] of opcoes.segmentosExtras) {
+			posicoes.push(ea.x, ea.y, ea.z, eb.x, eb.y, eb.z);
+		}
+	}
 
 	const lineGeom = new LineSegmentsGeometry();
 	if (posicoes.length > 0) {

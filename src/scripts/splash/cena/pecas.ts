@@ -207,11 +207,24 @@ export function criarPecasCubo(
 		0,
 		BORDA_INTERNA + (ESPESSURA_PAREDE - INSET_QUINA) / 2,
 	);
-	geometrias.push(geomRCompleta, geomRCorpo, geomRLaminaQuina);
+
+	// Faixa reta contínua do topo branco acima do ombro curvo do R (Z ∈ [-0.365, +0.16], Y = +0.5),
+	// fechando o aro superior até In_right e T_right sem bloquear o triângulo aberto sob a aresta reta
+	const zInicioCurvaR = 0.5 - 660 * ESCALA_SVG; // +0.16 (x_svg = 660)
+	const comprimentoTopoOmbroR = zInicioCurvaR - -BORDA_INTERNA; // 0.525
+	const geomRTopoContinuo = new THREE.PlaneGeometry(ESPESSURA_PAREDE, comprimentoTopoOmbroR);
+	geomRTopoContinuo.rotateX(-Math.PI / 2);
+	geomRTopoContinuo.translate(
+		0.5 - ESPESSURA_PAREDE / 2,
+		0.5,
+		(-BORDA_INTERNA + zInicioCurvaR) / 2,
+	);
+	geometrias.push(geomRCompleta, geomRCorpo, geomRLaminaQuina, geomRTopoContinuo);
 
 	const matR = criarMaterialChapado({
 		corExterna: CORES.rExterna,
 		normalExterna: new THREE.Vector3(1, 0, 0),
+		mascaraOmbroR: true,
 		direcaoLuz,
 	});
 	materiais.push(matR);
@@ -226,6 +239,11 @@ export function criarPecasCubo(
 	meshRLamina.castShadow = true;
 	meshRLamina.receiveShadow = true;
 
+	const meshRTopoContinuo = new THREE.Mesh(geomRTopoContinuo, matR);
+	meshRTopoContinuo.name = 'malha-r-topo-continuo';
+	meshRTopoContinuo.castShadow = false;
+	meshRTopoContinuo.receiveShadow = false;
+
 	const transformarArestasR: TransformarSegmento = (a, b) => {
 		if (perto(a.y, 0.5) && perto(b.y, 0.5)) {
 			// Remove emenda interna na quina frontal (Z > +0.365) sobre o topo do W
@@ -237,10 +255,34 @@ export function criarPecasCubo(
 				return null;
 			}
 		}
+		// Remove o arco traseiro (X = +0.365) do ombro superior direito do R
+		// (que projetaria um arco preto solto dentro do aro branco superior),
+		// preservando integralmente o contorno interno do furo do R
+		if (perto(a.x, BORDA_INTERNA) && perto(b.x, BORDA_INTERNA)) {
+			const mz = (a.z + b.z) * 0.5;
+			const my = (a.y + b.y) * 0.5;
+			const xSvg = (0.5 - mz) * 1000;
+			const ySvg = (0.5 - my) * 1000;
+			if (xSvg >= 658 && ySvg <= 340) {
+				const rElipse = Math.hypot((xSvg - 660) / 340, (ySvg - 336) / 336);
+				if (rElipse > 0.85) {
+					return null;
+				}
+			}
+		}
 		return [a, b];
 	};
 	const contornoR = criarContornoGeometria(geomRCompleta, materialContorno, {
 		transformar: transformarArestasR,
+		segmentosExtras: [
+			// Continuação reta da aresta externa superior (T_front -> T_right) sobre o ombro do R
+			[new THREE.Vector3(0.5, 0.5, zInicioCurvaR), new THREE.Vector3(0.5, 0.5, -BORDA_INTERNA)],
+			// Continuação reta da aresta interna superior até fechar a quina limpa em In_right
+			[
+				new THREE.Vector3(BORDA_INTERNA, 0.5, zInicioCurvaR),
+				new THREE.Vector3(BORDA_INTERNA, 0.5, -BORDA_INTERNA),
+			],
+		],
 	});
 	contornoR.name = 'contorno-r';
 	geometrias.push(contornoR.geometry);
@@ -248,6 +290,7 @@ export function criarPecasCubo(
 	const grupoR = envolverEmPivo('peca-r', POSICOES_FINAIS.r, [
 		meshRCorpo,
 		meshRLamina,
+		meshRTopoContinuo,
 		contornoR,
 	]);
 

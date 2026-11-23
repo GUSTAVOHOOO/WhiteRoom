@@ -6,6 +6,7 @@ export interface OpcoesMaterialChapado {
 	normalExterna?: THREE.Vector3;
 	ignoraSombraInternaX?: boolean;
 	mascaraDireitaR?: boolean;
+	mascaraOmbroR?: boolean;
 	direcaoLuz: THREE.Vector3;
 }
 
@@ -19,6 +20,7 @@ export interface UniformesMaterialChapado {
 	uDirLuz: { value: THREE.Vector3 };
 	uIgnoraSombraInternaX: { value: number };
 	uMascaraDireitaR: { value: number };
+	uMascaraOmbroR: { value: number };
 	uRazaoProjYX: { value: number };
 }
 
@@ -63,7 +65,7 @@ bool wrEstaADireitaDoR(vec3 localPos, float razaoProjYX) {
 	float yR = 1000.0 - (Y + razaoProjYX * (1000.0 - X));
 
 	// Preserva integralmente a borda branca superior (T_back -> T_right) e acima dela
-	if (yR <= 1.5) return false;
+	if (yR <= 0.5) return false;
 
 	// Faixa superior do bojo (arco elíptico A 340 336 centrado em (660, 336))
 	if (yR <= 336.0) {
@@ -108,6 +110,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 		uDirLuz: { value: opcoes.direcaoLuz.clone().normalize() },
 		uIgnoraSombraInternaX: { value: opcoes.ignoraSombraInternaX ? 1.0 : 0.0 },
 		uMascaraDireitaR: { value: opcoes.mascaraDireitaR ? 1.0 : 0.0 },
+		uMascaraOmbroR: { value: opcoes.mascaraOmbroR ? 1.0 : 0.0 },
 		uRazaoProjYX: { value: RAZAO_PROJECAO_Y_SOBRE_X },
 	};
 
@@ -118,7 +121,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 		polygonOffsetUnits: 1,
 	});
 
-	const chaveCache = `wr-chapado-${opcoes.corExterna ?? 'quarto'}-${opcoes.ignoraSombraInternaX ? 1 : 0}-${opcoes.mascaraDireitaR ? 1 : 0}`;
+	const chaveCache = `wr-chapado-${opcoes.corExterna ?? 'quarto'}-${opcoes.ignoraSombraInternaX ? 1 : 0}-${opcoes.mascaraDireitaR ? 1 : 0}-${opcoes.mascaraOmbroR ? 1 : 0}`;
 	material.customProgramCacheKey = () => chaveCache;
 
 	material.onBeforeCompile = (shader) => {
@@ -158,6 +161,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 				uniform vec3 uDirLuz;
 				uniform float uIgnoraSombraInternaX;
 				uniform float uMascaraDireitaR;
+				uniform float uMascaraOmbroR;
 				uniform float uRazaoProjYX;
 				varying vec3 vWrLocalPos;
 				varying vec3 vWrLocalNormal;
@@ -174,6 +178,20 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 
 				vec3 wrNLocal = normalize( vWrLocalNormal );
 				vec3 wrNWorld = normalize( vWrWorldNormal );
+
+				// Oculta a projeção da extrusão curva do ombro superior direito do R
+				// acima da curva ocre (mantendo o triângulo aberto sob a borda reta T_front -> T_right)
+				if (
+					uMascaraOmbroR > 0.5 &&
+					vWrLocalPos.x < 0.499 &&
+					vWrLocalPos.y < 0.499 &&
+					vWrLocalPos.y > 0.16 &&
+					vWrLocalPos.z < 0.16 &&
+					wrNLocal.y > 0.01 &&
+					wrNLocal.z < -0.01
+				) {
+					discard;
+				}
 
 				if ( uTemFaceExterna > 0.5 && dot( wrNLocal, uNormalExterna ) > 0.85 ) {
 					outgoingLight = uCorExterna;
