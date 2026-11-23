@@ -18,6 +18,7 @@ export interface UniformesMaterialChapado {
 	uCorInterna: { value: THREE.Color };
 	uCorSombra: { value: THREE.Color };
 	uCorSombraPernaR: { value: THREE.Color };
+	uCorBatentePorta: { value: THREE.Color };
 	uDirLuz: { value: THREE.Vector3 };
 	uIgnoraSombraInternaX: { value: number };
 	uMascaraDireitaR: { value: number };
@@ -109,6 +110,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 		uCorInterna: { value: new THREE.Color(CORES.interna) },
 		uCorSombra: { value: new THREE.Color(CORES.sombra) },
 		uCorSombraPernaR: { value: new THREE.Color(CORES.sombraPernaR) },
+		uCorBatentePorta: { value: new THREE.Color(CORES.batentePorta) },
 		uDirLuz: { value: opcoes.direcaoLuz.clone().normalize() },
 		uIgnoraSombraInternaX: { value: opcoes.ignoraSombraInternaX ? 1.0 : 0.0 },
 		uMascaraDireitaR: { value: opcoes.mascaraDireitaR ? 1.0 : 0.0 },
@@ -161,6 +163,7 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 				uniform vec3 uCorInterna;
 				uniform vec3 uCorSombra;
 				uniform vec3 uCorSombraPernaR;
+				uniform vec3 uCorBatentePorta;
 				uniform vec3 uDirLuz;
 				uniform float uIgnoraSombraInternaX;
 				uniform float uMascaraDireitaR;
@@ -225,6 +228,23 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 					// Face inferior em sombra sob a perna diagonal do R (#B3B4AE no JPG),
 					// preservando #C6C5C1 global nas demais sombras da cena
 					outgoingLight = uCorSombraPernaR;
+				} else if (
+					uIgnoraSombraInternaX > 0.5 &&
+					wrNLocal.z > 0.85 &&
+					vWrLocalPos.z < 0.0 &&
+					vWrLocalPos.y < 0.180
+				) {
+					// Batente interno direito da porta em fundo-esquerda: cinza vertical uniforme
+					// (#CCCCC7 medido no JPG), sem a sombra diagonal projetada pelo lintel
+					outgoingLight = uCorBatentePorta;
+				} else if (
+					uIgnoraSombraInternaX > 0.5 &&
+					wrNLocal.x > 0.85 &&
+					vWrLocalPos.z < -0.105 &&
+					vWrLocalPos.y < -0.310
+				) {
+					// Triângulo claro abaixo da linha de fechamento/soleira em y ≈ 533 à direita da porta
+					outgoingLight = uCorTopo;
 				} else if (
 					uMascaraDireitaR > 0.5 &&
 					vWrLocalPos.x > -0.165 &&

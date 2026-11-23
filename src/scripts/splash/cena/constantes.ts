@@ -81,6 +81,7 @@ export const CORES = {
 	interna: '#EBEAE6',
 	sombra: '#C6C5C1',
 	sombraPernaR: '#B3B4AE',
+	batentePorta: '#CCCCC7',
 	contorno: '#171717',
 	linhaConstrucao: '#343432',
 } as const;

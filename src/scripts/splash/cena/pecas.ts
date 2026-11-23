@@ -38,12 +38,22 @@ const BORDA_TRAS_FURO_R = 0.5 - PROFUNDIDADE_FURO_R; // 0.388
 const PROFUNDIDADE_PERNA_R = 0.196;
 const BORDA_TRAS_PERNA_R = 0.5 - PROFUNDIDADE_PERNA_R; // 0.304
 
+// Profundidade aparente medida no JPG para o batente interno direito da porta em `fundo-esquerda`:
+// ~70/1000 (vs 135/1000 do topo da parede; documentado em `perfis.md`), preservando a espessura
+// de 135 no perímetro externo e sem alterar `fundo-esquerda.svg`.
+const PROFUNDIDADE_PORTA_FE = 0.07;
+const BORDA_TRAS_PORTA_FE = -BORDA_INTERNA - PROFUNDIDADE_PORTA_FE; // -0.435
+
 function pontoNoFuroInternoR(y: number, z: number): boolean {
 	return z >= -0.295 && z <= 0.295 && y >= 0.042 && y <= 0.320;
 }
 
 function pontoNaFaceInferiorPernaR(y: number, z: number): boolean {
 	return (perto(y, -0.126) && perto(z, -0.02)) || (perto(y, -0.5) && perto(z, -0.27));
+}
+
+function pontoNaPortaFE(y: number, z: number): boolean {
+	return y <= 0.18 && z >= -0.11 && z <= 0.16;
 }
 
 /**
@@ -80,6 +90,26 @@ function ajustarProfundidadePernaR(geom: THREE.BufferGeometry): void {
 		const z = pos.getZ(i);
 		if (perto(x, BORDA_INTERNA) && pontoNaFaceInferiorPernaR(y, z)) {
 			pos.setX(i, BORDA_TRAS_PERNA_R);
+		}
+	}
+	pos.needsUpdate = true;
+	geom.computeBoundingBox();
+	geom.computeBoundingSphere();
+}
+
+/**
+ * Avança apenas os vértices traseiros (`X = -0.5`) da abertura da porta em `fundo-esquerda`
+ * para `X = -0.435` (profundidade aparente 70/1000 medida no JPG), preservando a espessura
+ * de 135/1000 no topo e bordas externas da parede e sem alterar `fundo-esquerda.svg`.
+ */
+function ajustarProfundidadePortaFE(geom: THREE.BufferGeometry): void {
+	const pos = geom.getAttribute('position');
+	for (let i = 0; i < pos.count; i++) {
+		const x = pos.getX(i);
+		const y = pos.getY(i);
+		const z = pos.getZ(i);
+		if (perto(x, -0.5) && pontoNaPortaFE(y, z)) {
+			pos.setX(i, BORDA_TRAS_PORTA_FE);
 		}
 	}
 	pos.needsUpdate = true;
@@ -381,7 +411,9 @@ export function criarPecasCubo(
 	geomFE.rotateY(Math.PI / 2);
 	geomFE.translate(-BORDA_INTERNA, 0.5, 0.5);
 	limitarEixoGeometria(geomFE, 'z', 'max', BORDA_INTERNA);
-	geometrias.push(geomFE);
+	const geomFEContorno = geomFE.clone();
+	ajustarProfundidadePortaFE(geomFE);
+	geometrias.push(geomFE, geomFEContorno);
 
 	const matFE = criarMaterialChapado({
 		ignoraSombraInternaX: true,
@@ -405,10 +437,27 @@ export function criarPecasCubo(
 				return recortarSegmentoNoIntervalo(a, b, 'z', -BORDA_INTERNA, BORDA_INTERNA);
 			}
 		}
+		// Ajusta as arestas traseiras da abertura da porta para a profundidade aparente 70/1000
+		const aNaPorta = pontoNaPortaFE(a.y, a.z);
+		const bNaPorta = pontoNaPortaFE(b.y, b.z);
+		if ((aNaPorta && perto(a.x, -0.5)) || (bNaPorta && perto(b.x, -0.5))) {
+			const na = a.clone();
+			const nb = b.clone();
+			if (aNaPorta && perto(na.x, -0.5)) na.x = BORDA_TRAS_PORTA_FE;
+			if (bNaPorta && perto(nb.x, -0.5)) nb.x = BORDA_TRAS_PORTA_FE;
+			return [na, nb];
+		}
 		return [a, b];
 	};
-	const contornoFE = criarContornoGeometria(geomFE, materialContorno, {
+	const contornoFE = criarContornoGeometria(geomFEContorno, materialContorno, {
 		transformar: transformarArestasFE,
+		segmentosExtras: [
+			// Fechamento inferior/soleira visível na fresta à direita do batente da porta (y ≈ 533 px)
+			[
+				new THREE.Vector3(-BORDA_INTERNA, -0.31, -0.105),
+				new THREE.Vector3(-BORDA_INTERNA, -0.31, -0.165),
+			],
+		],
 	});
 	contornoFE.name = 'contorno-fundo-esquerda';
 	geometrias.push(contornoFE.geometry);
