@@ -4,6 +4,8 @@ export interface AlvoHeader {
 
 export interface OpcoesAnimacaoSplash {
 	svgLinhas?: SVGSVGElement;
+	svgFinal?: HTMLElement;
+	fundo?: HTMLElement;
 	container?: HTMLElement;
 	dpr?: number;
 }
