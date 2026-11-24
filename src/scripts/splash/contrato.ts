@@ -2,6 +2,12 @@ export interface AlvoHeader {
 	rect: DOMRect;
 }
 
+export interface OpcoesAnimacaoSplash {
+	svgLinhas?: SVGSVGElement;
+	container?: HTMLElement;
+	dpr?: number;
+}
+
 export interface AnimacaoSplash {
 	duracao: number;
 	tocar(): Promise<void>;
@@ -12,4 +18,5 @@ export interface AnimacaoSplash {
 export type CriarAnimacao = (
 	canvas: HTMLCanvasElement,
 	alvo: () => AlvoHeader,
+	opcoes?: OpcoesAnimacaoSplash,
 ) => Promise<AnimacaoSplash>;

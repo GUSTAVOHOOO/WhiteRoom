@@ -64,9 +64,23 @@ export interface Polilinha2D {
 	fechada: boolean;
 }
 
+export interface EstadoAnimacaoHlr {
+	/** Progresso de crescimento das linhas de construção a partir dos asteriscos (0..1). */
+	progressoConstrucao?: number;
+	/** Progresso da haste interna de construção sobre o vão superior do W (0..1; padrão 1). */
+	progressoPonteW?: number;
+	/** Fator de pulso radial das linhas de construção no impacto (1 = normal). */
+	pulsoConstrucao?: number;
+	/** Matriz mundo aplicada às linhas de construção (acompanha o cubo no voo ao header). */
+	matrizConstrucao?: THREE.Matrix4 | null;
+	/** Escala uniforme atual do cubo (escala espessuras e tolerâncias proporcionalmente). */
+	escalaCubo?: number;
+}
+
 export interface LinhasHLR {
 	atualizar: () => void;
 	definirDimensoes: (largura: number, altura: number) => void;
+	definirEstadoAnimacao: (estado: EstadoAnimacaoHlr) => void;
 	paraSvgString: () => string;
 	destruir: () => void;
 }
