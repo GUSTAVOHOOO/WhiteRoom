@@ -9,11 +9,12 @@
  * Produz:
  * - `src/assets/logo/whiteroom-logo.svg` (completa, viewBox 0 0 1024 1024, contorno 5,50)
  * - `src/assets/logo/whiteroom-logo-header.svg` (sem construção, viewBox 580×580 justo, contorno 10,00 p/ 40 px)
- * - `public/favicon.svg` (sem construção, viewBox 620×620 com ~6% margem, contorno 14,00 p/ 16 px, transparente)
- * - `public/favicon.ico` (multi-tamanho 16, 32 e 48 px em PNG-dentro-de-ICO)
- * - `public/apple-touch-icon.png` (180×180, fundo #FAFAF8, ~12% margem, contorno 5,50)
- * - `public/icon-192.png` (192×192, fundo #FAFAF8, ~12% margem, contorno 5,50)
- * - `public/icon-512.png` (512×512, fundo #FAFAF8, ~12% margem, contorno 5,50)
+ * - `public/favicon.svg` (versão simplificada derivada do 3D em grade 32×32, placa #FAFAF8 rx 21% + borda #E4E3DF)
+ * - `public/favicon.ico` (multi-tamanho 16 e 32 px simplificados + 48 px completo na placa #FAFAF8, PNG-dentro-de-ICO)
+ * - `public/apple-touch-icon.png` (180×180, fundo quadrado opaco #FAFAF8, ~12% margem, contorno 5,50)
+ * - `public/icon-192.png` (192×192, purpose "any", placa arredondada #FAFAF8 rx 21% + transparente fora)
+ * - `public/icon-512.png` (512×512, purpose "any", placa arredondada #FAFAF8 rx 21% + transparente fora)
+ * - `public/icon-maskable-512.png` (512×512, purpose "maskable", fundo quadrado opaco #FAFAF8, cubo na zona segura 80%)
  * - `public/site.webmanifest`
  *
  * Uso:
@@ -40,7 +41,7 @@ const HOST = '127.0.0.1';
 const REFERENCIA_PX = 1024;
 const ESPESSURA_CONTORNO = 5.5;
 const ESPESSURA_CONTORNO_HEADER = 10.0;
-const ESPESSURA_CONTORNO_FAVICON = 14.0;
+const ESPESSURA_CONTORNO_FAVICON_48 = 9.0;
 const ESPESSURA_CONSTRUCAO = 1.15;
 
 // Paleta exata de `src/scripts/splash/cena/constantes.ts` (CORES)
@@ -65,14 +66,21 @@ const IDX_BATENTE_PORTA = 6;
 const COR_CONTORNO = '#171717';
 const COR_CONSTRUCAO = '#A8A8A4';
 const COR_PAPEL = '#FAFAF8';
+const COR_BORDA_PLACA = '#E4E3DF';
 
-// Enquadramentos quadrados derivados da caixa exata do cubo (~478,6 × 545,9 sem stroke, ~552 com stroke):
+// Enquadramentos quadrados derivados da caixa exata do cubo (~478,8 × 545,7 sem stroke, ~552 com stroke):
 // - Header (40 px): 580 → ~2,5% respiro vertical, cubo ~38 px dentro dos 40 px
-// - Favicon (16–48 px): 620 → ~6% margem ao redor do cubo (546/620 = 88% de altura → 6% em cada lado)
-// - App icons (180/192/512 px): 726 → ~12% margem ao redor do cubo (552/726 = 76% → 12% em cada lado)
+// - Favicon simplificado (16 e 32 px + favicon.svg): viewBox 32×32 com placa #FAFAF8 (rx 21%) e respiro 8%
+// - Favicon 48 px completo: 658 → ~8,5% margem ao redor do cubo na placa #FAFAF8 (rx 21%)
+// - App icons (180/192/512 px): 726 → ~12% margem ao redor do cubo
+// - Maskable icon (512 px): 740 → cubo inteiro dentro do círculo seguro central de 80% (diâmetro máx 75,9%)
 export const HEADER_VIEWBOX_LADO = 580;
-export const FAVICON_VIEWBOX_LADO = 620;
+export const FAVICON_SIMPLIFICADO_LADO = 32;
+export const FAVICON_SIMPLIFICADO_MARGEM_FRAC = 0.08;
+export const FAVICON_48_VIEWBOX_LADO = 658;
 export const APP_ICON_VIEWBOX_LADO = 726;
+export const MASKABLE_ICON_VIEWBOX_LADO = 740;
+export const PLACA_RAIO_FRAC = 0.21;
 
 // Parâmetros de vetorização em coordenadas 1024×1024:
 // - Na camada `sombra` (única com bordas sem contorno preto), o campo contínuo 8× MSAA
@@ -662,22 +670,251 @@ function extrairCamada(field, W, H, escalaPara1024, nome, tolRdp) {
 		loops: filtrados.length,
 		vertices: totalVertices,
 		d: loopsParaPathD(filtrados),
+		poligonos: filtrados,
 	};
 }
 
-function montarSvgSemConstrucao({ pathsFaces, dContorno, cx, cy, lado, espContorno, tamanhoPx }) {
+function fmtCoordCompacto(v) {
+	const r = Number(v.toFixed(2));
+	return Object.is(r, -0) ? '0' : String(r);
+}
+
+function deduplicarConsecutivos(pts, fechado = true) {
+	const out = [];
+	for (const p of pts) {
+		const prev = out[out.length - 1];
+		if (!prev || Math.abs(prev.x - p.x) > 1e-6 || Math.abs(prev.y - p.y) > 1e-6) {
+			out.push(p);
+		}
+	}
+	if (fechado && out.length > 1) {
+		const first = out[0];
+		const last = out[out.length - 1];
+		if (Math.abs(first.x - last.x) <= 1e-6 && Math.abs(first.y - last.y) <= 1e-6) {
+			out.pop();
+		}
+	}
+	return out;
+}
+
+function poligonoParaD(pts, fechar = true) {
+	const limpo = deduplicarConsecutivos(pts, fechar);
+	if (limpo.length === 0) return '';
+	let out = `M${fmtCoordCompacto(limpo[0].x)} ${fmtCoordCompacto(limpo[0].y)}`;
+	for (let i = 1; i < limpo.length; i++) {
+		out += `L${fmtCoordCompacto(limpo[i].x)} ${fmtCoordCompacto(limpo[i].y)}`;
+	}
+	return fechar ? `${out}Z` : out;
+}
+
+/**
+ * Remove micro-degraus de espessura interna (vértices cujas duas arestas adjacentes
+ * são menores que `minArestaPx`), mantendo todos os vértices estruturais do cubo.
+ */
+function removerMicroDegraus(pts, minArestaPx) {
+	const out = pts.map((p) => ({ ...p }));
+	let mudou = true;
+	while (mudou && out.length > 4) {
+		mudou = false;
+		for (let i = 0; i < out.length && out.length > 4; i++) {
+			const prev = out[(i - 1 + out.length) % out.length];
+			const cur = out[i];
+			const next = out[(i + 1) % out.length];
+			const d1 = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+			const d2 = Math.hypot(next.x - cur.x, next.y - cur.y);
+			if (d1 < minArestaPx && d2 < minArestaPx) {
+				out.splice(i, 1);
+				mudou = true;
+				break;
+			}
+		}
+	}
+	return out;
+}
+
+function extrairCadeiaEntre(pts, iIni, iFim) {
+	const fwd = [];
+	for (let k = iIni; ; k = (k + 1) % pts.length) {
+		fwd.push(pts[k]);
+		if (k === iFim) break;
+	}
+	const bwd = [];
+	for (let k = iIni; ; k = (k - 1 + pts.length) % pts.length) {
+		bwd.push(pts[k]);
+		if (k === iFim) break;
+	}
+	return [fwd, bwd];
+}
+
+/**
+ * Constrói o SVG simplificado para 16 e 32 px (`public/favicon.svg` e entradas 16/32 do `.ico`)
+ * diretamente a partir dos polígonos 3D extraídos (`topo`, `w-externa`, `r-externa`),
+ * descartando janelas, porta, sombras e divisórias internas e ajustando os polígonos à grade 32×32.
+ */
+function montarFaviconSimplificado(camadas) {
+	const porNome = new Map(camadas.map((c) => [c.nome, c]));
+	const ordenarPorArea = (pols) =>
+		[...pols].sort((a, b) => Math.abs(areaPoligono(b)) - Math.abs(areaPoligono(a)));
+
+	const topoPols = ordenarPorArea(porNome.get('topo')?.poligonos ?? []);
+	const wPols = ordenarPorArea(porNome.get('w-externa')?.poligonos ?? []);
+	const rPols = ordenarPorArea(porNome.get('r-externa')?.poligonos ?? []);
+
+	if (topoPols.length === 0 || wPols.length === 0 || rPols.length < 2) {
+		throw new Error('Camadas 3D insuficientes para derivar o favicon simplificado.');
+	}
+
+	const topoBruto = topoPols[0];
+	const wBruto = wPols[0];
+	const rExtBruto = rPols[0];
+	const rFuroBruto = rPols[1];
+
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	for (const pol of [topoBruto, wBruto, rExtBruto]) {
+		for (const p of pol) {
+			if (p.x < minX) minX = p.x;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.y > maxY) maxY = p.y;
+		}
+	}
+	const cubeW = maxX - minX;
+	const cubeH = maxY - minY;
+	const cubeCx = (minX + maxX) / 2;
+	const cubeCy = (minY + maxY) / 2;
+
+	// Simplificação estrutural sobre os polígonos reais do 3D
+	const topoClean = removerMicroDegraus(simplificarPoligonoFechado(topoBruto, 12.0), 38.0);
+	const wClean = simplificarPoligonoFechado(wBruto, 4.0);
+	const rExtClean = simplificarPoligonoFechado(rExtBruto, 3.0);
+	const rFuroClean = simplificarPoligonoFechado(rFuroBruto, 2.0);
+
+	// Deriva a cavidade interna limpa (sem janela nem porta) costurando a borda interna de `topo`
+	// com o recorte superior de `w-externa` entre os dois vértices compartilhados.
+	const juncoes = [];
+	for (let ti = 0; ti < topoClean.length; ti++) {
+		for (let wi = 0; wi < wClean.length; wi++) {
+			const d = Math.hypot(topoClean[ti].x - wClean[wi].x, topoClean[ti].y - wClean[wi].y);
+			if (d < 4.0 && topoClean[ti].x > minX + 20 && topoClean[ti].x < cubeCx - 20) {
+				juncoes.push({ ti, wi, x: topoClean[ti].x });
+			}
+		}
+	}
+	juncoes.sort((a, b) => a.x - b.x);
+	let cavidadeClean = [];
+	if (juncoes.length >= 2) {
+		const jEsq = juncoes[0];
+		const jDir = juncoes[juncoes.length - 1];
+		const [tFwd, tBwd] = extrairCadeiaEntre(topoClean, jDir.ti, jEsq.ti);
+		const topoInterno = tFwd.some((p) => Math.abs(p.y - minY) < 6) ? tBwd : tFwd;
+		const [wFwd, wBwd] = extrairCadeiaEntre(wClean, jEsq.wi, jDir.wi);
+		const wRecorte = wFwd.some((p) => Math.abs(p.y - maxY) < 6) ? wBwd : wFwd;
+		cavidadeClean = [...topoInterno, ...wRecorte.slice(1, -1)];
+	}
+
+	// Ponto frontal do encontro topo↔W↔R (vértice de maior Y do topo)
+	const topoFrontal = topoClean.reduce((best, p) => (p.y > best.y ? p : best), topoClean[0]);
+
+	const lado = FAVICON_SIMPLIFICADO_LADO;
+	const disponivel = lado * (1 - 2 * FAVICON_SIMPLIFICADO_MARGEM_FRAC);
+	const escala = disponivel / Math.max(cubeW, cubeH);
+	const centro = lado / 2;
+
+	// Ajuste à grade de pixels 32×32: X em inteiros (paredes verticais nítidas em 16 e 32 px: x=4, 16, 28)
+	// e Y em meio-pixel (preserva espessura uniforme de 2 px em todo o aro branco superior isométrico).
+	const mapear = (pts) =>
+		pts.map((p) => ({
+			x: Math.round(centro + (p.x - cubeCx) * escala),
+			y: Math.round((centro + (p.y - cubeCy) * escala) * 2) / 2,
+		}));
+
+	const topoGrid = mapear(topoClean);
+	const wGrid = mapear(wClean);
+	const rExtGrid = mapear(rExtClean);
+	const rFuroGrid = mapear(rFuroClean);
+	const cavGrid = mapear(cavidadeClean);
+	const espinhaGrid = mapear([
+		{ x: cubeCx, y: topoFrontal.y },
+		{ x: cubeCx, y: maxY },
+	]);
+
+	const bordaSw = 0.9;
+	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
+	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
+	const rectSize = Number((lado - bordaSw).toFixed(2));
+	const rectOff = Number((bordaSw / 2).toFixed(2));
+
+	const linhas = [
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision">`,
+		`\t<rect data-favicon-placa="clara" x="${rectOff}" y="${rectOff}" width="${rectSize}" height="${rectSize}" rx="${rxInset}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${bordaSw}"/>`,
+	];
+
+	if (cavGrid.length >= 3) {
+		linhas.push(
+			`\t<path data-logo-face="interna-simplificada" fill="${PALETA[IDX_INTERNA].hex}" d="${poligonoParaD(cavGrid)}"/>`,
+		);
+	}
+
+	linhas.push(
+		`\t<path data-logo-face="topo" fill="${PALETA[IDX_TOPO].hex}" stroke="${COR_CONTORNO}" stroke-width="1" stroke-linejoin="miter" stroke-miterlimit="3" d="${poligonoParaD(topoGrid)}"/>`,
+		`\t<path data-logo-face="w-externa" fill="${PALETA[IDX_W].hex}" d="${poligonoParaD(wGrid)}"/>`,
+		`\t<path data-logo-face="r-externa" fill="${PALETA[IDX_R].hex}" fill-rule="evenodd" d="${poligonoParaD(rExtGrid)}${poligonoParaD(rFuroGrid)}"/>`,
+		`\t<path data-logo-camada="contorno-r" fill="none" stroke="${COR_CONTORNO}" stroke-width="0.9" stroke-linejoin="round" d="${poligonoParaD(rExtGrid)}"/>`,
+		`\t<path data-logo-camada="espinha" fill="none" stroke="${COR_CONTORNO}" stroke-width="0.9" stroke-linecap="butt" d="${poligonoParaD(espinhaGrid, false)}"/>`,
+		'</svg>',
+		'',
+	);
+
+	return linhas.join('\n');
+}
+
+function montarSvgSemConstrucao({
+	pathsFaces,
+	dContorno,
+	cx,
+	cy,
+	lado,
+	espContorno,
+	tamanhoPx,
+	placa = null,
+}) {
 	const vx = Number((cx - lado / 2).toFixed(2));
 	const vy = Number((cy - lado / 2).toFixed(2));
 	const dims = tamanhoPx ? ` width="${tamanhoPx}" height="${tamanhoPx}"` : '';
-	return [
+
+	let placaEl = null;
+	if (placa?.tipo === 'arredondada') {
+		const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
+		const sw = placa.bordaPx ? Number(placa.bordaPx.toFixed(2)) : 0;
+		if (sw > 0) {
+			const x = Number((vx + sw / 2).toFixed(2));
+			const y = Number((vy + sw / 2).toFixed(2));
+			const w = Number((lado - sw).toFixed(2));
+			const rx = Number((rxExt - sw / 2).toFixed(2));
+			placaEl = `\t<rect data-icone-placa="arredondada" x="${x}" y="${y}" width="${w}" height="${w}" rx="${rx}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${sw}"/>`;
+		} else {
+			placaEl = `\t<rect data-icone-placa="arredondada" x="${vx}" y="${vy}" width="${lado}" height="${lado}" rx="${rxExt}" fill="${COR_PAPEL}"/>`;
+		}
+	} else if (placa?.tipo === 'quadrada') {
+		placaEl = `\t<rect data-icone-placa="quadrada" x="${vx}" y="${vy}" width="${lado}" height="${lado}" fill="${COR_PAPEL}"/>`;
+	}
+
+	const linhas = [
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${lado} ${lado}"${dims} shape-rendering="geometricPrecision">`,
+	];
+	if (placaEl) linhas.push(placaEl);
+	linhas.push(
 		'\t<g data-logo-camada="faces">',
 		pathsFaces,
 		'\t</g>',
 		`\t<path data-logo-camada="contorno" fill="none" stroke="${COR_CONTORNO}" stroke-width="${espContorno.toFixed(2)}" stroke-linejoin="miter" stroke-miterlimit="4" stroke-linecap="butt" d="${dContorno}"/>`,
 		'</svg>',
 		'',
-	].join('\n');
+	);
+	return linhas.join('\n');
 }
 
 /** Empacota múltiplos PNGs (16, 32, 48 px) em um único arquivo `.ico` padrão (PNG-em-ICO). */
@@ -757,33 +994,61 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 		espContorno: ESPESSURA_CONTORNO_HEADER,
 	});
 
-	// Favicon SVG: sem construção, viewBox 620×620 (~6% margem), contorno 14,00 p/ legibilidade em 16 px
-	const faviconSvg = montarSvgSemConstrucao({
+	// Favicon SVG: versão simplificada derivada do 3D em grade 32×32 com placa #FAFAF8 (rx 21%) + borda #E4E3DF
+	const faviconSvg = montarFaviconSimplificado(camadas);
+
+	// Favicon 48 px: versão completa legível dentro da mesma placa arredondada #FAFAF8 (~8,5% respiro)
+	const svgFavicon48 = montarSvgSemConstrucao({
 		pathsFaces,
 		dContorno,
 		cx: cubeCx,
 		cy: cubeCy,
-		lado: FAVICON_VIEWBOX_LADO,
-		espContorno: ESPESSURA_CONTORNO_FAVICON,
+		lado: FAVICON_48_VIEWBOX_LADO,
+		espContorno: ESPESSURA_CONTORNO_FAVICON_48,
+		placa: { tipo: 'arredondada', bordaPx: FAVICON_48_VIEWBOX_LADO / 48 },
 	});
 
-	// Base para ícones grandes (180, 192, 512 px): margem ~12% (726×726), contorno oficial 5,50
-	const svgAppIcon = montarSvgSemConstrucao({
+	// Apple touch icon (180 px): fundo quadrado opaco #FAFAF8 (iOS arredonda sozinho), ~12% margem, contorno oficial 5,50
+	const svgAppleTouch = montarSvgSemConstrucao({
 		pathsFaces,
 		dContorno,
 		cx: cubeCx,
 		cy: cubeCy,
 		lado: APP_ICON_VIEWBOX_LADO,
 		espContorno: ESPESSURA_CONTORNO,
+		placa: { tipo: 'quadrada' },
 	});
 
-	const [png16, png32, png48, appleTouch180, icon192, icon512] = await Promise.all([
+	// Ícones Android `purpose: "any"` (192 e 512 px): placa arredondada #FAFAF8 (rx 21%, borda #E4E3DF) e transparente fora
+	const svgAndroidAny = montarSvgSemConstrucao({
+		pathsFaces,
+		dContorno,
+		cx: cubeCx,
+		cy: cubeCy,
+		lado: APP_ICON_VIEWBOX_LADO,
+		espContorno: ESPESSURA_CONTORNO,
+		placa: { tipo: 'arredondada', bordaPx: APP_ICON_VIEWBOX_LADO * 0.004 },
+	});
+
+	// Ícone Android `purpose: "maskable"` (512 px): fundo quadrado opaco #FAFAF8 e cubo dentro da zona segura central 80%
+	const svgAndroidMaskable = montarSvgSemConstrucao({
+		pathsFaces,
+		dContorno,
+		cx: cubeCx,
+		cy: cubeCy,
+		lado: MASKABLE_ICON_VIEWBOX_LADO,
+		espContorno: ESPESSURA_CONTORNO,
+		placa: { tipo: 'quadrada' },
+	});
+
+	const [png16, png32, png48, appleTouch180, icon192, icon512, iconMaskable512] = await Promise.all([
 		renderizarIconePng(faviconSvg, 16, null),
 		renderizarIconePng(faviconSvg, 32, null),
-		renderizarIconePng(faviconSvg, 48, null),
-		renderizarIconePng(svgAppIcon, 180, COR_PAPEL),
-		renderizarIconePng(svgAppIcon, 192, COR_PAPEL),
-		renderizarIconePng(svgAppIcon, 512, COR_PAPEL),
+		renderizarIconePng(svgFavicon48, 48, null),
+		renderizarIconePng(svgAppleTouch, 180, COR_PAPEL),
+		renderizarIconePng(svgAndroidAny, 192, null),
+		renderizarIconePng(svgAndroidAny, 512, null),
+		renderizarIconePng(svgAndroidMaskable, 512, COR_PAPEL),
 	]);
 
 	const faviconIco = empacotarIco([
@@ -797,8 +1062,9 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 			name: 'WhiteRoom',
 			short_name: 'WhiteRoom',
 			icons: [
-				{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-				{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+				{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+				{ src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+				{ src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
 			],
 			theme_color: COR_PAPEL,
 			background_color: COR_PAPEL,
@@ -819,6 +1085,7 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 		appleTouch180,
 		icon192,
 		icon512,
+		iconMaskable512,
 		siteWebmanifest,
 		headerViewBox: {
 			x: vx,
@@ -829,9 +1096,16 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 			espContorno: ESPESSURA_CONTORNO_HEADER,
 		},
 		faviconSpec: {
-			viewBoxSize: FAVICON_VIEWBOX_LADO,
-			espContorno: ESPESSURA_CONTORNO_FAVICON,
+			simplificadoViewBox: FAVICON_SIMPLIFICADO_LADO,
+			simplificadoMargemFrac: FAVICON_SIMPLIFICADO_MARGEM_FRAC,
+			placaRaioFrac: PLACA_RAIO_FRAC,
+			placaCor: COR_PAPEL,
+			placaBordaCor: COR_BORDA_PLACA,
+			favicon48Modo: 'completo',
+			favicon48ViewBoxSize: FAVICON_48_VIEWBOX_LADO,
+			favicon48EspContorno: ESPESSURA_CONTORNO_FAVICON_48,
 			appIconViewBoxSize: APP_ICON_VIEWBOX_LADO,
+			maskableViewBoxSize: MASKABLE_ICON_VIEWBOX_LADO,
 			appIconEspContorno: ESPESSURA_CONTORNO,
 		},
 	};
@@ -1025,6 +1299,7 @@ export async function gerarLogosSvg(opcoes = {}) {
 				'apple-touch-icon.png': ativos.appleTouch180.length,
 				'icon-192.png': ativos.icon192.length,
 				'icon-512.png': ativos.icon512.length,
+				'icon-maskable-512.png': ativos.iconMaskable512.length,
 				'site.webmanifest': Buffer.byteLength(ativos.siteWebmanifest, 'utf8'),
 			},
 			bboxContorno: dados.bboxContorno,
@@ -1045,6 +1320,7 @@ function listarDestinos(resultado, outDir, publicDir) {
 		{ nome: 'apple-touch-icon.png', caminho: path.join(publicDir, 'apple-touch-icon.png'), conteudo: resultado.appleTouch180 },
 		{ nome: 'icon-192.png', caminho: path.join(publicDir, 'icon-192.png'), conteudo: resultado.icon192 },
 		{ nome: 'icon-512.png', caminho: path.join(publicDir, 'icon-512.png'), conteudo: resultado.icon512 },
+		{ nome: 'icon-maskable-512.png', caminho: path.join(publicDir, 'icon-maskable-512.png'), conteudo: resultado.iconMaskable512 },
 		{ nome: 'site.webmanifest', caminho: path.join(publicDir, 'site.webmanifest'), conteudo: Buffer.from(resultado.siteWebmanifest, 'utf8') },
 	];
 }
