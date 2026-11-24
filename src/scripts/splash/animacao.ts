@@ -44,23 +44,15 @@ interface EstadoCoreografia {
 	progressoConstrucao: number;
 	pulsoLinhas: number;
 	wPosT: number;
-	wOvT: number;
-	wReboteT: number;
-	wSx: number;
-	wSy: number;
-	wSz: number;
 	rPosT: number;
-	rOvT: number;
-	rReboteT: number;
-	rSx: number;
-	rSy: number;
-	rSz: number;
 	qPosT: number;
 	sqX: number;
 	sqY: number;
 	sqZ: number;
 	shakeX: number;
 	shakeY: number;
+	shakeCenaX: number;
+	shakeCenaY: number;
 	vooT: number;
 }
 
@@ -69,12 +61,32 @@ interface MetricasLayout {
 	altura: number;
 	pixelsPorUnidade: number;
 	wInicio: THREE.Vector3;
-	wOvershoot: THREE.Vector3;
 	rInicio: THREE.Vector3;
-	rOvershoot: THREE.Vector3;
 	quartoInicioY: number;
 	dockPos: THREE.Vector3;
 	dockEscala: number;
+}
+
+export interface TelemetriaPecaPose {
+	visivel: boolean;
+	posLocal: { x: number; y: number; z: number };
+	escala: { x: number; y: number; z: number };
+	projComTremorPx: { x: number; y: number };
+	projSemTremorPx: { x: number; y: number };
+}
+
+export interface TelemetriaPosePecas {
+	tempo: number;
+	tremorCenaPx: { x: number; y: number };
+	tremorQuartoPx: { x: number; y: number };
+	pulsoLinhas: number;
+	linhasAcompanhamTremorCena: boolean;
+	w: TelemetriaPecaPose;
+	r: TelemetriaPecaPose & {
+		malhaSolidoVisivel: boolean;
+		malhaCorpoVisivel: boolean;
+		malhaLaminaVisivel: boolean;
+	};
 }
 
 export interface TelemetriaQuadroSplash {
@@ -100,6 +112,7 @@ export interface AnimacaoSplashControlavel extends AnimacaoSplash {
 	obterUltimoHlrMs(): number;
 	obterUltimoTrabalhoMs(): number;
 	obterDimensoes(): { largura: number; altura: number };
+	obterPosePecas(): TelemetriaPosePecas;
 }
 
 function estaTravadoPorTeste(): boolean {
@@ -116,23 +129,15 @@ function criarEstadoInicial(): EstadoCoreografia {
 		progressoConstrucao: 0,
 		pulsoLinhas: 1,
 		wPosT: 0,
-		wOvT: 0,
-		wReboteT: 0,
-		wSx: 1,
-		wSy: 1,
-		wSz: 1,
 		rPosT: 0,
-		rOvT: 0,
-		rReboteT: 0,
-		rSx: 1,
-		rSy: 1,
-		rSz: 1,
 		qPosT: 0,
 		sqX: 1,
 		sqY: 1,
 		sqZ: 1,
 		shakeX: 0,
 		shakeY: 0,
+		shakeCenaX: 0,
+		shakeCenaY: 0,
 		vooT: 0,
 	};
 }
@@ -205,11 +210,7 @@ export function criarAnimacaoControlavel(
 		altura: 1,
 		pixelsPorUnidade: 1,
 		wInicio: new THREE.Vector3(),
-		wOvershoot: new THREE.Vector3(),
 		rInicio: new THREE.Vector3(),
-		// Rebote seco do R ao longo da trajetória de entrada (quique contido para baixo-direita
-		// ao colidir no W, calculado em `recalcularLayout` a partir de `rInicio`)
-		rOvershoot: new THREE.Vector3(),
 		quartoInicioY: 2.5,
 		dockPos: new THREE.Vector3(),
 		dockEscala: 0.08,
@@ -307,37 +308,34 @@ export function criarAnimacaoControlavel(
 		pecas.r.visible = rVis;
 		pecas.quarto.visible = qVis;
 
-		// Deslocamento do W: entrada diagonal do canto inferior esquerdo + overshoot e rebote
+		// Deslocamento do W: entrada diagonal monotônica do canto inferior esquerdo parando seco na pose final
 		const wFalta = 1 - estado.wPosT;
-		const wOvFator = estado.wOvT - estado.wReboteT;
-		const wxOff = layout.wInicio.x * wFalta + layout.wOvershoot.x * wOvFator;
-		const wyOff = layout.wInicio.y * wFalta + layout.wOvershoot.y * wOvFator;
-		const wzOff = layout.wInicio.z * wFalta + layout.wOvershoot.z * wOvFator;
+		const wxOff = layout.wInicio.x * wFalta;
+		const wyOff = layout.wInicio.y * wFalta;
+		const wzOff = layout.wInicio.z * wFalta;
 		pecas.w.position.set(
 			POSICOES_FINAIS.w.x + wxOff,
 			POSICOES_FINAIS.w.y + wyOff,
 			POSICOES_FINAIS.w.z + wzOff,
 		);
-		pecas.w.scale.set(estado.wSx, estado.wSy, estado.wSz);
+		pecas.w.scale.set(1, 1, 1);
 
-		// Deslocamento do R: entrada diagonal do canto inferior direito + rebote seco ao longo da trajetória
+		// Deslocamento do R: entrada diagonal monotônica do canto inferior direito parando seco na pose final
 		const rFalta = 1 - estado.rPosT;
-		const rOvFator = estado.rOvT - estado.rReboteT;
-		const rxOff = layout.rInicio.x * rFalta + layout.rOvershoot.x * rOvFator;
-		const ryOff = layout.rInicio.y * rFalta + layout.rOvershoot.y * rOvFator;
-		const rzOff = layout.rInicio.z * rFalta + layout.rOvershoot.z * rOvFator;
+		const rxOff = layout.rInicio.x * rFalta;
+		const ryOff = layout.rInicio.y * rFalta;
+		const rzOff = layout.rInicio.z * rFalta;
 		pecas.r.position.set(
 			POSICOES_FINAIS.r.x + rxOff,
 			POSICOES_FINAIS.r.y + ryOff,
 			POSICOES_FINAIS.r.z + rzOff,
 		);
-		pecas.r.scale.set(estado.rSx, estado.rSy, estado.rSz);
+		pecas.r.scale.set(1, 1, 1);
 
-		// Alterna entre a malha sólida íntegra (voo/rebote) e a malha com encaixe de quina (pose encaixada no W)
-		const rDeslocMag = Math.hypot(rxOff, ryOff, rzOff);
-		const rEscalaDesvio =
-			Math.abs(estado.rSx - 1) + Math.abs(estado.rSy - 1) + Math.abs(estado.rSz - 1);
-		const usarRSolido = rDeslocMag > 1e-4 || rEscalaDesvio > 1e-4;
+		// Alterna entre a malha sólida íntegra (voo) e a malha com encaixe de quina (pose encaixada no W):
+		// como `rPosT` é estritamente monotônico até 1 e nunca recua após o contato, a troca ocorre uma
+		// única vez no quadro do encaixe e nunca volta para a malha sólida.
+		const usarRSolido = estado.rPosT < 1 - 1e-6;
 		if (meshRSolido && meshRCorpo && meshRLamina) {
 			meshRSolido.visible = usarRSolido;
 			meshRCorpo.visible = !usarRSolido;
@@ -353,12 +351,16 @@ export function criarAnimacaoControlavel(
 		);
 		pecas.quarto.scale.set(1, 1, 1);
 
-		// Achatamento no impacto ancorado na base (y = -0.5)
+		// Achatamento no impacto do quarto ancorado na base (y = -0.5)
 		pivoSquash.scale.set(estado.sqX, estado.sqY, estado.sqZ);
 
-		// Tremor amortecido de 2-3 px em espaço de tela (câmera permanece fixa)
-		const shakeMundoX = estado.shakeX / layout.pixelsPorUnidade;
-		const shakeMundoY = estado.shakeY / layout.pixelsPorUnidade;
+		// Tremor em espaço de tela (câmera permanece fixa):
+		// - `shakeCenaX/Y`: tremor curto rígido da cena inteira (peças + linhas) nos impactos de W e R
+		// - `shakeX/Y`: tremor amortecido de 2-3 px no impacto do quarto branco
+		const totalShakeX = estado.shakeX + estado.shakeCenaX;
+		const totalShakeY = estado.shakeY + estado.shakeCenaY;
+		const shakeMundoX = totalShakeX / layout.pixelsPorUnidade;
+		const shakeMundoY = totalShakeY / layout.pixelsPorUnidade;
 		pivoShake.position
 			.set(0, 0, 0)
 			.addScaledVector(camRight, shakeMundoX)
@@ -382,12 +384,15 @@ export function criarAnimacaoControlavel(
 
 		atualizarSombra(escalaCubo, maxDesloc, qVis ? qyOff : 0);
 
-		const usarMatrizConstrucao = voo > 1e-6;
+		const tremorCenaAtivo =
+			Math.abs(estado.shakeCenaX) > 1e-5 || Math.abs(estado.shakeCenaY) > 1e-5;
+		const matrizConstrucao =
+			voo > 1e-6 ? raizCubo.matrixWorld : tremorCenaAtivo ? pivoShake.matrixWorld : null;
 		linhas.definirEstadoAnimacao({
 			progressoConstrucao: estado.progressoConstrucao,
 			progressoPonteW: estado.wPosT,
 			pulsoConstrucao: estado.pulsoLinhas,
-			matrizConstrucao: usarMatrizConstrucao ? raizCubo.matrixWorld : null,
+			matrizConstrucao,
 			escalaCubo,
 		});
 	};
@@ -438,17 +443,8 @@ export function criarAnimacaoControlavel(
 			.addScaledVector(camRight, meiaLargura * 0.85 + 1.15)
 			.addScaledVector(camUp, -(meiaAltura + 1.15));
 
-		layout.wOvershoot.copy(layout.wInicio).negate().normalize().multiplyScalar(0.045);
-
-		// Quique elástico contido (~5 px em 1280×800) ao longo da reta de entrada (+rInicio no plano da tela)
-		// após o impacto seco na quina do W: nunca ergue os pés acima da base nem expõe faces do W.
 		// Em viewports retrato muito altos, compensa ao longo de -camBack (invisível na projeção ortográfica)
-		// para garantir rz < 0 (sempre atrás da face frontal preta do W em Z = +0,5).
-		layout.rOvershoot.copy(layout.rInicio).normalize().multiplyScalar(0.0185);
-		if (layout.rOvershoot.z > -0.003) {
-			const passoBack = (layout.rOvershoot.z + 0.003) / camBack.z;
-			layout.rOvershoot.addScaledVector(camBack, -passoBack);
-		}
+		// para garantir rInicio.z <= -0,25 (sempre atrás da face frontal preta do W em Z = +0,5).
 		if (layout.rInicio.z > -0.25) {
 			const passoBack = (layout.rInicio.z + 0.25) / camBack.z;
 			layout.rInicio.addScaledVector(camBack, -passoBack);
@@ -521,80 +517,41 @@ export function criarAnimacaoControlavel(
 		0,
 	);
 
-	// 0,30 - 0,70 s: W entra do canto inferior esquerdo subindo numa leve diagonal e bate seco
+	// 0,30 - 0,70 s: W entra do canto inferior esquerdo com desaceleração forte e para seco na pose final
+	// (sem overshoot, sem rebote e sem escala não uniforme). Impacto sentido por tremor rígido da cena (70 ms)
+	// e pulso sutil nas linhas de construção.
 	timeline.to(
 		estado,
 		{
 			wPosT: 1,
-			duration: 0.37,
-			ease: 'power4.in',
+			duration: 0.4,
+			ease: 'expo.out',
 		},
 		0.3,
 	);
-	timeline.to(
-		estado,
-		{
-			wOvT: 1,
-			wSx: 0.94,
-			wSy: 0.96,
-			wSz: 1.04,
-			duration: 0.03,
-			ease: 'power2.out',
-		},
-		0.67,
-	);
-	// Rebote mecânico do W (~150 ms) antes do R entrar
-	timeline.to(
-		estado,
-		{
-			wReboteT: 1,
-			duration: 0.15,
-			ease: 'back.out(2.8)',
-		},
-		0.7,
-	);
-	timeline.to(
-		estado,
-		{
-			wSx: 1,
-			wSy: 1,
-			wSz: 1,
-			duration: 0.15,
-			ease: 'back.out(2.4)',
-		},
-		0.7,
-	);
+	timeline.to(estado, { shakeCenaX: 1.6, shakeCenaY: 1.0, duration: 0.02, ease: 'none' }, 0.7);
+	timeline.to(estado, { shakeCenaX: -0.9, shakeCenaY: -0.6, duration: 0.025, ease: 'none' }, 0.72);
+	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 0.745);
+	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 0.7);
+	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 0.725);
 
-	// 0,85 - 1,25 s: R entra do canto inferior direito, bate seco na quina do W em 1,22 s
-	// e rebota contido ao longo da trajetória de entrada (pico em 1,25 s)
+	// 0,85 - 1,22 s: R entra do canto inferior direito com desaceleração forte e para seco encaixado no W
+	// (troca de malha única em 1,22 s, sem rebote e sem reabrir fresta). Impacto sentido por tremor rígido
+	// da cena inteira (peças W+R e linhas juntas por 70 ms) e pulso sutil nas linhas.
 	timeline.to(
 		estado,
 		{
 			rPosT: 1,
 			duration: 0.37,
-			ease: 'power4.in',
+			ease: 'expo.out',
 		},
 		0.85,
 	);
-	timeline.to(
-		estado,
-		{
-			rOvT: 1,
-			duration: 0.03,
-			ease: 'power2.out',
-		},
-		1.22,
-	);
-	// Retorno mecânico do rebote do R (~160 ms) travando firme na quina do W sem atravessá-lo
-	timeline.to(
-		estado,
-		{
-			rReboteT: 1,
-			duration: 0.16,
-			ease: 'power3.out',
-		},
-		1.25,
-	);
+	timeline.to(estado, { shakeCenaX: -1.6, shakeCenaY: 1.0, duration: 0.02, ease: 'none' }, 1.22);
+	timeline.to(estado, { shakeCenaX: 0.9, shakeCenaY: -0.6, duration: 0.025, ease: 'none' }, 1.24);
+	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 1.265);
+	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 1.22);
+	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 1.245);
 
 	// 1,60 - 1,90 s: quarto branco cai reto de cima como peso e gera impacto com achatamento ~7%,
 	// tremor de 2-3 px e pulso nas linhas (pico do impacto em 1,90 s)
@@ -735,23 +692,15 @@ export function criarAnimacaoControlavel(
 				progressoConstrucao: 1,
 				pulsoLinhas: 1,
 				wPosT: 1,
-				wOvT: 1,
-				wReboteT: 1,
-				wSx: 1,
-				wSy: 1,
-				wSz: 1,
 				rPosT: 1,
-				rOvT: 1,
-				rReboteT: 1,
-				rSx: 1,
-				rSy: 1,
-				rSz: 1,
 				qPosT: 1,
 				sqX: 1,
 				sqY: 1,
 				sqZ: 1,
 				shakeX: 0,
 				shakeY: 0,
+				shakeCenaX: 0,
+				shakeCenaY: 0,
 				vooT: 1,
 				duration: duracao,
 				ease: 'power3.inOut',
@@ -815,6 +764,69 @@ export function criarAnimacaoControlavel(
 
 		obterDimensoes(): { largura: number; altura: number } {
 			return { largura: layout.largura, altura: layout.altura };
+		},
+
+		obterPosePecas(): TelemetriaPosePecas {
+			raizCubo.updateMatrixWorld(true);
+			camera.updateMatrixWorld(true);
+
+			const totalShakeX = estado.shakeX + estado.shakeCenaX;
+			const totalShakeY = estado.shakeY + estado.shakeCenaY;
+			const shakeMundo = new THREE.Vector3()
+				.addScaledVector(camRight, totalShakeX / layout.pixelsPorUnidade)
+				.addScaledVector(camUp, totalShakeY / layout.pixelsPorUnidade);
+
+			const projetar = (pontoMundo: THREE.Vector3): { x: number; y: number } => {
+				const v = pontoMundo.clone().project(camera);
+				return {
+					x: Number((((v.x + 1) * 0.5) * layout.largura).toFixed(4)),
+					y: Number((((1 - v.y) * 0.5) * layout.altura).toFixed(4)),
+				};
+			};
+
+			const lerPeca = (grupo: THREE.Object3D): TelemetriaPecaPose => {
+				const mundoComTremor = new THREE.Vector3(0, 0, 0).applyMatrix4(grupo.matrixWorld);
+				const mundoSemTremor = mundoComTremor.clone().sub(shakeMundo);
+				return {
+					visivel: grupo.visible,
+					posLocal: {
+						x: Number(grupo.position.x.toFixed(6)),
+						y: Number(grupo.position.y.toFixed(6)),
+						z: Number(grupo.position.z.toFixed(6)),
+					},
+					escala: {
+						x: Number(grupo.scale.x.toFixed(6)),
+						y: Number(grupo.scale.y.toFixed(6)),
+						z: Number(grupo.scale.z.toFixed(6)),
+					},
+					projComTremorPx: projetar(mundoComTremor),
+					projSemTremorPx: projetar(mundoSemTremor),
+				};
+			};
+
+			const tremorCenaAtivo =
+				Math.abs(estado.shakeCenaX) > 1e-5 || Math.abs(estado.shakeCenaY) > 1e-5;
+
+			return {
+				tempo: Number(timeline.time().toFixed(4)),
+				tremorCenaPx: {
+					x: Number(estado.shakeCenaX.toFixed(4)),
+					y: Number(estado.shakeCenaY.toFixed(4)),
+				},
+				tremorQuartoPx: {
+					x: Number(estado.shakeX.toFixed(4)),
+					y: Number(estado.shakeY.toFixed(4)),
+				},
+				pulsoLinhas: Number(estado.pulsoLinhas.toFixed(5)),
+				linhasAcompanhamTremorCena: tremorCenaAtivo && estado.vooT <= 1e-6,
+				w: lerPeca(pecas.w),
+				r: {
+					...lerPeca(pecas.r),
+					malhaSolidoVisivel: Boolean(meshRSolido?.visible),
+					malhaCorpoVisivel: Boolean(meshRCorpo?.visible),
+					malhaLaminaVisivel: Boolean(meshRLamina?.visible),
+				},
+			};
 		},
 
 		destruir(): void {

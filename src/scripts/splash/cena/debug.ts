@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { criarAnimacaoControlavel, DURACAO_SPLASH_S } from '../animacao';
+import {
+	criarAnimacaoControlavel,
+	DURACAO_SPLASH_S,
+	type TelemetriaPosePecas,
+} from '../animacao';
 import { REFERENCIA_PX } from './constantes';
 import { criarCena, type CenaCubo } from './cubo';
 import { POSICOES_FINAIS } from './pecas';
@@ -40,6 +44,7 @@ export interface RelatorioBenchT4 {
 	trabalhoQuadroMs: ResumoMetricaMs;
 	hlrMs: ResumoMetricaMs;
 	seek: (t: number) => void;
+	obterPosePecas: () => TelemetriaPosePecas;
 }
 
 declare global {
@@ -319,6 +324,7 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
 			trabalhoQuadroMs: resumirAmostrasMs([anim.obterUltimoTrabalhoMs()]),
 			hlrMs: resumirAmostrasMs([anim.obterUltimoHlrMs()]),
 			seek: (novoT: number) => anim.seek(novoT),
+			obterPosePecas: () => anim.obterPosePecas(),
 		};
 
 		window.requestAnimationFrame(() => {
@@ -415,6 +421,7 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
 				if (btnToggle) btnToggle.textContent = 'Tocar';
 				atualizarPainel(novoT, animRef);
 			},
+			obterPosePecas: () => animRef.obterPosePecas(),
 		};
 	};
 

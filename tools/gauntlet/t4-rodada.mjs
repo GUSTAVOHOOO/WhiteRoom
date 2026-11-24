@@ -1172,6 +1172,158 @@ try {
 			await context.close();
 		}
 
+		// 5h. Estabilidade pós-impacto de W (0,70..0,85 s) e R (1,22..1,60 s) a cada 10 ms via /?debug=t4&t=...
+		{
+			const context = await browser.newContext({
+				viewport: { width: 1280, height: 800 },
+				deviceScaleFactor: 1,
+			});
+			const page = await context.newPage();
+			anexarColetaConsole(page, 'estabilidade-pos-impacto', consoleMensagens);
+
+			const lerPoseEm = async (tSeg) => {
+				const tStr = tSeg.toFixed(2);
+				await page.goto(`${URL_BASE}/?debug=t4&t=${tStr}`, { waitUntil: 'domcontentloaded' });
+				await page.waitForFunction(
+					() => document.documentElement.dataset.capturaPronta === '1',
+					undefined,
+					{ timeout: 15000 },
+				);
+				return page.evaluate(() => window.__wrT4Bench?.obterPosePecas?.() ?? null);
+			};
+
+			const refFinal = await lerPoseEm(2.4);
+			const refDeltaRW = refFinal
+				? {
+						x: refFinal.r.projSemTremorPx.x - refFinal.w.projSemTremorPx.x,
+						y: refFinal.r.projSemTremorPx.y - refFinal.w.projSemTremorPx.y,
+					}
+				: null;
+
+			const temposW = [];
+			for (let ms = 700; ms <= 850; ms += 10) temposW.push(ms / 1000);
+			const temposR = [];
+			for (let ms = 1220; ms <= 1600; ms += 10) temposR.push(ms / 1000);
+
+			let maxErroProjWPx = 0;
+			let maxDesvioEscalaW = 0;
+			let maxTremorCenaWPx = 0;
+			let tremorFora80msW = 0;
+			let linhasSemTremorW = 0;
+
+			for (const t of temposW) {
+				const p = await lerPoseEm(t);
+				if (!p || !refFinal) continue;
+				const errPx = Math.hypot(
+					p.w.projSemTremorPx.x - refFinal.w.projSemTremorPx.x,
+					p.w.projSemTremorPx.y - refFinal.w.projSemTremorPx.y,
+				);
+				const devEsc = Math.max(
+					Math.abs(p.w.escala.x - 1),
+					Math.abs(p.w.escala.y - 1),
+					Math.abs(p.w.escala.z - 1),
+				);
+				const magTremor = Math.hypot(p.tremorCenaPx.x, p.tremorCenaPx.y);
+				if (errPx > maxErroProjWPx) maxErroProjWPx = errPx;
+				if (devEsc > maxDesvioEscalaW) maxDesvioEscalaW = devEsc;
+				if (magTremor > maxTremorCenaWPx) maxTremorCenaWPx = magTremor;
+				if (t > 0.78 + 1e-6 && magTremor > 1e-4) tremorFora80msW++;
+				if (magTremor > 1e-4 && !p.linhasAcompanhamTremorCena) linhasSemTremorW++;
+			}
+
+			const poseAntesContatoR = await lerPoseEm(1.21);
+			const malhaSolidoAntesContato = Boolean(poseAntesContatoR?.r?.malhaSolidoVisivel);
+
+			let maxErroProjRPx = 0;
+			let maxDesvioEscalaR = 0;
+			let maxErroRelativoRWPx = 0;
+			let maxTremorCenaRPx = 0;
+			let tremorFora80msR = 0;
+			let linhasSemTremorR = 0;
+			let quadrosMalhaSolidoPosContato = 0;
+			let quadrosMalhaEncaixeAusente = 0;
+
+			for (const t of temposR) {
+				const p = await lerPoseEm(t);
+				if (!p || !refFinal || !refDeltaRW) continue;
+				const errPx = Math.hypot(
+					p.r.projSemTremorPx.x - refFinal.r.projSemTremorPx.x,
+					p.r.projSemTremorPx.y - refFinal.r.projSemTremorPx.y,
+				);
+				const devEsc = Math.max(
+					Math.abs(p.r.escala.x - 1),
+					Math.abs(p.r.escala.y - 1),
+					Math.abs(p.r.escala.z - 1),
+				);
+				const deltaRW = {
+					x: p.r.projComTremorPx.x - p.w.projComTremorPx.x,
+					y: p.r.projComTremorPx.y - p.w.projComTremorPx.y,
+				};
+				const errRelRW = Math.hypot(deltaRW.x - refDeltaRW.x, deltaRW.y - refDeltaRW.y);
+				const magTremor = Math.hypot(p.tremorCenaPx.x, p.tremorCenaPx.y);
+
+				if (errPx > maxErroProjRPx) maxErroProjRPx = errPx;
+				if (devEsc > maxDesvioEscalaR) maxDesvioEscalaR = devEsc;
+				if (errRelRW > maxErroRelativoRWPx) maxErroRelativoRWPx = errRelRW;
+				if (magTremor > maxTremorCenaRPx) maxTremorCenaRPx = magTremor;
+				if (t > 1.3 + 1e-6 && magTremor > 1e-4) tremorFora80msR++;
+				if (magTremor > 1e-4 && !p.linhasAcompanhamTremorCena) linhasSemTremorR++;
+				if (p.r.malhaSolidoVisivel) quadrosMalhaSolidoPosContato++;
+				if (!p.r.malhaCorpoVisivel || !p.r.malhaLaminaVisivel) quadrosMalhaEncaixeAusente++;
+			}
+
+			const wOk =
+				Boolean(refFinal) &&
+				maxErroProjWPx <= 0.5 &&
+				maxDesvioEscalaW <= 1e-4 &&
+				maxTremorCenaWPx <= 2.5 &&
+				tremorFora80msW === 0 &&
+				linhasSemTremorW === 0;
+			const rOk =
+				Boolean(refFinal) &&
+				malhaSolidoAntesContato &&
+				maxErroProjRPx <= 0.5 &&
+				maxDesvioEscalaR <= 1e-4 &&
+				maxErroRelativoRWPx <= 0.5 &&
+				maxTremorCenaRPx <= 2.5 &&
+				tremorFora80msR === 0 &&
+				linhasSemTremorR === 0 &&
+				quadrosMalhaSolidoPosContato === 0 &&
+				quadrosMalhaEncaixeAusente === 0;
+
+			resultados.estabilidadePosImpacto = {
+				ok: wOk && rOk,
+				toleranciaPx: 0.5,
+				w: {
+					ok: wOk,
+					janelaSeg: [0.7, 0.85],
+					passoMs: 10,
+					amostras: temposW.length,
+					maxErroProjSemTremorPx: Number(maxErroProjWPx.toFixed(4)),
+					maxDesvioEscala: Number(maxDesvioEscalaW.toFixed(6)),
+					maxTremorCenaPx: Number(maxTremorCenaWPx.toFixed(3)),
+					tremorForaJanela80ms: tremorFora80msW,
+					linhasSemTremorCena: linhasSemTremorW,
+				},
+				r: {
+					ok: rOk,
+					janelaSeg: [1.22, 1.6],
+					passoMs: 10,
+					amostras: temposR.length,
+					malhaSolidoAntesContato,
+					quadrosMalhaSolidoPosContato,
+					quadrosMalhaEncaixeAusente,
+					maxErroProjSemTremorPx: Number(maxErroProjRPx.toFixed(4)),
+					maxErroRelativoRWComTremorPx: Number(maxErroRelativoRWPx.toFixed(4)),
+					maxDesvioEscala: Number(maxDesvioEscalaR.toFixed(6)),
+					maxTremorCenaPx: Number(maxTremorCenaRPx.toFixed(3)),
+					tremorForaJanela80ms: tremorFora80msR,
+					linhasSemTremorCena: linhasSemTremorR,
+				},
+			};
+			await context.close();
+		}
+
 		testesFluxoReal = {
 			todosOk: Object.values(resultados).every((r) => r.ok),
 			...resultados,
