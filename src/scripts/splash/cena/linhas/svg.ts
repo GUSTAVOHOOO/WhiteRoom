@@ -41,6 +41,7 @@ export interface CamadaSvgHlr {
 		altura: number,
 		dConstrucao: string,
 		dContorno: string,
+		escalaCubo?: number,
 	) => void;
 	paraSvgString: () => string;
 	destruir: () => void;
@@ -80,12 +81,14 @@ export function criarCamadaSvgHlr(svg: SVGSVGElement): CamadaSvgHlr {
 		altura: number,
 		dConstrucao: string,
 		dContorno: string,
+		escalaCubo = 1,
 	): void => {
 		const w = Math.max(1, largura);
 		const h = Math.max(1, altura);
 		const escala = Math.min(w, h) / REFERENCIA_PX;
-		const espConstrucao = Math.max(0.45, ESPESSURA_LINHA_CONSTRUCAO_1024_PX * escala);
-		const espContorno = Math.max(1, ESPESSURA_CONTORNO_1024_PX * escala);
+		const fator = Math.max(0.01, escalaCubo);
+		const espConstrucao = Math.max(0.45, ESPESSURA_LINHA_CONSTRUCAO_1024_PX * escala) * fator;
+		const espContorno = Math.max(1, ESPESSURA_CONTORNO_1024_PX * escala) * fator;
 
 		if (w !== ultimaLargura || h !== ultimaAltura) {
 			svg.setAttribute('viewBox', `0 0 ${w} ${h}`);

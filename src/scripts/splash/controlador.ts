@@ -1,5 +1,10 @@
 import gsap from 'gsap';
-import type { AlvoHeader, AnimacaoSplash, CriarAnimacao } from './contrato';
+import type {
+	AlvoHeader,
+	AnimacaoSplash,
+	CriarAnimacao,
+	OpcoesAnimacaoSplash,
+} from './contrato';
 
 declare global {
 	interface Window {
@@ -44,6 +49,7 @@ async function carregar3D(
 	canvas: HTMLCanvasElement,
 	alvo: () => AlvoHeader,
 	flags: FlagsTeste,
+	opcoes: OpcoesAnimacaoSplash,
 ): Promise<AnimacaoSplash> {
 	if (flags.falha) {
 		throw new Error('Falha simulada do 3D (?splash=falha)');
@@ -54,7 +60,7 @@ async function carregar3D(
 
 	const modulo = await import('./animacao');
 	const criar: CriarAnimacao = modulo.criarAnimacao;
-	return criar(canvas, alvo);
+	return criar(canvas, alvo, opcoes);
 }
 
 export function iniciarSplash(): void {
@@ -71,6 +77,7 @@ export function iniciarSplash(): void {
 	const fundoEl = document.querySelector<HTMLElement>('[data-splash-fundo]');
 	const logoEl = document.querySelector<HTMLElement>('[data-splash-logo]');
 	const canvasEl = document.querySelector<HTMLCanvasElement>('[data-splash-canvas]');
+	const linhasEl = document.querySelector<SVGSVGElement>('[data-splash-linhas]');
 	const alvoEl = document.querySelector<HTMLElement>('[data-splash-alvo]');
 
 	if (!overlayEl || !fundoEl || !logoEl || !canvasEl || !alvoEl) {
@@ -81,12 +88,11 @@ export function iniciarSplash(): void {
 
 	const paramsDebug = new URLSearchParams(window.location.search);
 	if (paramsDebug.has('debug')) {
-		const linhasEl = document.querySelector<SVGSVGElement>('[data-splash-linhas]');
 		if (!linhasEl) return;
 		const modoDebug = paramsDebug.get('debug') ?? '';
 		void import('./cena/debug').then(({ iniciarModoDebug }) => {
 			iniciarModoDebug(
-				{ overlayEl, fundoEl, logoEl, canvasEl, linhasEl },
+				{ overlayEl, fundoEl, logoEl, canvasEl, linhasEl, alvoEl },
 				modoDebug,
 			);
 		});
@@ -135,7 +141,11 @@ export function iniciarSplash(): void {
 		tweenFallbackLogo?.kill();
 		tweenFallbackFundo?.kill();
 		tweenReduzida?.kill();
-		gsap.killTweensOf([overlayEl, fundoEl, logoEl, canvasEl]);
+		gsap.killTweensOf(
+			linhasEl
+				? [overlayEl, fundoEl, logoEl, canvasEl, linhasEl]
+				: [overlayEl, fundoEl, logoEl, canvasEl],
+		);
 
 		window.removeEventListener('pointerdown', onPointerDown);
 		window.removeEventListener('keydown', onKeyDown);
@@ -163,8 +173,8 @@ export function iniciarSplash(): void {
 		const destino = obterAlvo().rect;
 		const origemLargura = logoEl.offsetWidth;
 		const origemAltura = logoEl.offsetHeight;
-		const origemCx = window.innerWidth / 2;
-		const origemCy = window.innerHeight / 2;
+		const origemCx = (overlayEl.clientWidth || window.innerWidth) / 2;
+		const origemCy = (overlayEl.clientHeight || window.innerHeight) / 2;
 		const destinoCx = destino.left + destino.width / 2;
 		const destinoCy = destino.top + destino.height / 2;
 
@@ -186,6 +196,9 @@ export function iniciarSplash(): void {
 
 		logoEl.style.visibility = 'visible';
 		canvasEl.style.opacity = '0';
+		if (linhasEl) {
+			linhasEl.style.display = 'none';
+		}
 
 		tweenFallbackLogo?.kill();
 		tweenFallbackFundo?.kill();
@@ -332,7 +345,10 @@ export function iniciarSplash(): void {
 		executarFallback(VOO_FALLBACK_S);
 	}, TIMEOUT_3D_MS);
 
-	void carregar3D(canvasEl, obterAlvo, flags)
+	void carregar3D(canvasEl, obterAlvo, flags, {
+		svgLinhas: linhasEl ?? undefined,
+		container: overlayEl,
+	})
 		.then((instancia) => {
 			if (finalizada || desistiu3D || pulando) {
 				try {
@@ -346,12 +362,17 @@ export function iniciarSplash(): void {
 			limparTimers();
 			animacao3D = instancia;
 
-			// 3D pronto a tempo: esconde a logo parada, exibe canvas e toca
+			// 3D pronto a tempo: mantém a logo provisória oculta, exibe canvas + camada SVG de linhas e toca
 			logoEl.style.visibility = 'hidden';
 			canvasEl.style.opacity = '1';
+			if (linhasEl) {
+				linhasEl.classList.remove('hidden');
+				linhasEl.style.display = 'block';
+				linhasEl.style.opacity = '1';
+			}
 
 			return instancia.tocar().then(() => {
-				if (finalizada) return;
+				if (finalizada || pulando) return;
 				return new Promise<void>((resolve) => {
 					gsap.to(fundoEl, {
 						opacity: 0,
@@ -363,7 +384,7 @@ export function iniciarSplash(): void {
 			});
 		})
 		.then(() => {
-			if (animacao3D && !finalizada) {
+			if (animacao3D && !finalizada && !pulando) {
 				finalizar();
 			}
 		})

@@ -22,12 +22,19 @@ interface RetaSuporte {
 export function deduplicarEFundirColineares(
 	segmentos: readonly Segmento2D[],
 	tolDist = TOL_DIST_COLINEAR_PX,
+	escala = 1,
 ): Segmento2D[] {
+	const fator = Math.max(0.01, escala);
+	const tolDistEf = tolDist * fator;
+	const tolGapEf = TOL_GAP_COLINEAR_PX * fator;
+	const minLenEntrada = 0.05 * fator;
+	const minLenSaida = 0.1 * fator;
+
 	// Ordena por comprimento decrescente para que cada reta suporte seja ancorada
 	// pelo trecho mais longo (máxima precisão angular, evitando ruído de fragmentos curtos).
 	const ordenados = segmentos
 		.map((s) => ({ s, len: Math.hypot(s.x2 - s.x1, s.y2 - s.y1) }))
-		.filter((item) => item.len >= 0.05)
+		.filter((item) => item.len >= minLenEntrada)
 		.sort((a, b) => b.len - a.len);
 
 	const retas: RetaSuporte[] = [];
@@ -53,7 +60,7 @@ export function deduplicarEFundirColineares(
 			// Testa distância perpendicular real das duas pontas à reta candidata
 			const dist1 = Math.abs(-cand.uy * s.x1 + cand.ux * s.y1 - cand.d);
 			const dist2 = Math.abs(-cand.uy * s.x2 + cand.ux * s.y2 - cand.d);
-			if (dist1 <= tolDist && dist2 <= tolDist) {
+			if (dist1 <= tolDistEf && dist2 <= tolDistEf) {
 				alvo = cand;
 				break;
 			}
@@ -90,10 +97,10 @@ export function deduplicarEFundirColineares(
 
 		for (let k = 1; k < ivs.length; k++) {
 			const [lo, hi] = ivs[k];
-			if (lo <= curHi + TOL_GAP_COLINEAR_PX) {
+			if (lo <= curHi + tolGapEf) {
 				if (hi > curHi) curHi = hi;
 			} else {
-				if (curHi - curLo >= 0.1) {
+				if (curHi - curLo >= minLenSaida) {
 					resultado.push({
 						x1: px + reta.ux * curLo,
 						y1: py + reta.uy * curLo,
@@ -106,7 +113,7 @@ export function deduplicarEFundirColineares(
 			}
 		}
 
-		if (curHi - curLo >= 0.1) {
+		if (curHi - curLo >= minLenSaida) {
 			resultado.push({
 				x1: px + reta.ux * curLo,
 				y1: py + reta.uy * curLo,
@@ -126,7 +133,15 @@ export function deduplicarEFundirColineares(
 export function subtrairCoincidentesComContorno(
 	construcao: readonly Segmento2D[],
 	contorno: readonly Segmento2D[],
+	escala = 1,
 ): Segmento2D[] {
+	const fator = Math.max(0.01, escala);
+	const tolSubEf = TOL_SUBTRACAO_PX * fator;
+	const minLenC = 0.2 * fator;
+	const minLenK = 0.05 * fator;
+	const margemCorte = 0.15 * fator;
+	const minSobraCorte = 0.35 * fator;
+	const minLenSaida = 0.4 * fator;
 	const saida: Segmento2D[] = [];
 
 	for (let i = 0; i < construcao.length; i++) {
@@ -134,7 +149,7 @@ export function subtrairCoincidentesComContorno(
 		const dx = c.x2 - c.x1;
 		const dy = c.y2 - c.y1;
 		const len = Math.hypot(dx, dy);
-		if (len < 0.2) continue;
+		if (len < minLenC) continue;
 
 		const ux = dx / len;
 		const uy = dy / len;
@@ -149,19 +164,19 @@ export function subtrairCoincidentesComContorno(
 			const kdx = k.x2 - k.x1;
 			const kdy = k.y2 - k.y1;
 			const kLen = Math.hypot(kdx, kdy);
-			if (kLen < 0.05) continue;
+			if (kLen < minLenK) continue;
 
 			const sinAng = Math.abs((ux * kdy - uy * kdx) / kLen);
 			if (sinAng > 0.012) continue;
 
 			const dist1 = Math.abs(-uy * k.x1 + ux * k.y1 - d);
 			const dist2 = Math.abs(-uy * k.x2 + ux * k.y2 - d);
-			if (dist1 > TOL_SUBTRACAO_PX || dist2 > TOL_SUBTRACAO_PX) continue;
+			if (dist1 > tolSubEf || dist2 > tolSubEf) continue;
 
 			const kt1 = ux * k.x1 + uy * k.y1;
 			const kt2 = ux * k.x2 + uy * k.y2;
-			const cutLo = Math.min(kt1, kt2) - 0.15;
-			const cutHi = Math.max(kt1, kt2) + 0.15;
+			const cutLo = Math.min(kt1, kt2) - margemCorte;
+			const cutHi = Math.max(kt1, kt2) + margemCorte;
 
 			const prox: Array<[number, number]> = [];
 			for (let m = 0; m < livres.length; m++) {
@@ -169,8 +184,8 @@ export function subtrairCoincidentesComContorno(
 				if (cutHi <= a || cutLo >= b) {
 					prox.push([a, b]);
 				} else {
-					if (cutLo > a + 0.35) prox.push([a, cutLo]);
-					if (cutHi < b - 0.35) prox.push([cutHi, b]);
+					if (cutLo > a + minSobraCorte) prox.push([a, cutLo]);
+					if (cutHi < b - minSobraCorte) prox.push([cutHi, b]);
 				}
 			}
 			livres = prox;
@@ -180,7 +195,7 @@ export function subtrairCoincidentesComContorno(
 		const py = ux * d;
 		for (let m = 0; m < livres.length; m++) {
 			const [a, b] = livres[m];
-			if (b - a >= 0.4) {
+			if (b - a >= minLenSaida) {
 				saida.push({
 					x1: px + ux * a,
 					y1: py + uy * a,
@@ -206,12 +221,16 @@ interface ArestaGrafo {
  * com ângulo interno mais obtuso (mais próximo de 180°, priorizando silhuetas externas
  * e travessias retas em T-junctions) e fecha ciclos com `fechada = true` (`Z`).
  */
-export function encadearEmPolilinhas(segmentos: readonly Segmento2D[]): Polilinha2D[] {
+export function encadearEmPolilinhas(
+	segmentos: readonly Segmento2D[],
+	escala = 1,
+): Polilinha2D[] {
 	if (segmentos.length === 0) return [];
 
-	// 1. Soldar vértices próximos dentro de TOL_SNAP_VERTICE_PX
+	// 1. Soldar vértices próximos dentro de TOL_SNAP_VERTICE_PX * escala
 	const verts: Array<{ x: number; y: number; sx: number; sy: number; n: number }> = [];
-	const tol2 = TOL_SNAP_VERTICE_PX * TOL_SNAP_VERTICE_PX;
+	const tolSnap = TOL_SNAP_VERTICE_PX * Math.max(0.01, escala);
+	const tol2 = tolSnap * tolSnap;
 
 	const obterVertice = (x: number, y: number): number => {
 		for (let i = 0; i < verts.length; i++) {

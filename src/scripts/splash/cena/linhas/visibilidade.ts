@@ -1,7 +1,14 @@
 import * as THREE from 'three';
-import { ARESTAS_CONSTRUCAO } from './construcao';
+import { gerarArestasConstrucao } from './construcao';
 import { pontoEstaADireitaDoR } from './mascaras';
-import type { ArestaLocal, DadosMalhaHlr, Segmento2D, TipoMascaraHlr } from './tipos';
+import {
+	type ArestaLocal,
+	type DadosMalhaHlr,
+	type EstadoAnimacaoHlr,
+	PAPEL_OCLUSAO_CONSTRUCAO,
+	type Segmento2D,
+	type TipoMascaraHlr,
+} from './tipos';
 
 const GRADE_DIM = 32;
 // 1 u mundo ≈ 0.050125 NDC (far-near = 39.9).
@@ -12,9 +19,19 @@ const EPS_PLANO_EMENDA_NDC = 1.4e-4; // ≈ 0.0028 u mundo
 const MIN_COMP_2D_PX = 0.05;
 const TOL_COLINEAR_CORTE_PX = 0.25;
 
+export function objetoVisivelNaCena(obj: THREE.Object3D): boolean {
+	let atual: THREE.Object3D | null = obj;
+	while (atual) {
+		if (!atual.visible) return false;
+		atual = atual.parent;
+	}
+	return true;
+}
+
 interface TrianguloProjetado {
 	malhaId: number;
 	mascara?: TipoMascaraHlr;
+	papelConstrucao: number;
 	x0: number;
 	y0: number;
 	z0: number;
@@ -49,6 +66,7 @@ interface ArestaProjetada {
 	malhaId: number; // -1 para construção
 	mascara?: TipoMascaraHlr;
 	ehConstrucao: boolean;
+	ehPonteW: boolean;
 	x1: number;
 	y1: number;
 	z1: number;
@@ -107,7 +125,23 @@ export class MotorVisibilidadeHlr {
 		camera: THREE.OrthographicCamera,
 		largura: number,
 		altura: number,
+		estado?: EstadoAnimacaoHlr,
 	): ResultadoVisibilidade {
+		const escalaCubo = Math.max(0.01, estado?.escalaCubo ?? 1);
+		const escalaCubo2 = escalaCubo * escalaCubo;
+		const epsOclusaoNdc = EPS_OCLUSAO_NDC * escalaCubo;
+		const passoEmendaMundo = PASSO_EMENDA_MUNDO * escalaCubo;
+		const epsPlanoEmendaNdc = EPS_PLANO_EMENDA_NDC * escalaCubo;
+		const minComp2dPx = MIN_COMP_2D_PX * escalaCubo;
+		const tolColinearCortePx = TOL_COLINEAR_CORTE_PX * escalaCubo;
+		const margemBboxTriPx = 0.1 * escalaCubo;
+		const minDenomPx2 = 1e-6 * escalaCubo2;
+
+		const progressoConstrucao = estado?.progressoConstrucao ?? 1;
+		const progressoPonteW = estado?.progressoPonteW ?? 1;
+		const pulsoConstrucao = estado?.pulsoConstrucao ?? 1;
+		const matConstrucao = estado?.matrizConstrucao ?? null;
+
 		this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
 		const vp = this.viewProj.elements;
 
@@ -128,8 +162,14 @@ export class MotorVisibilidadeHlr {
 			if (y > cenaMaxY) cenaMaxY = y;
 		};
 
-		// Projetar triângulos de cada malha
+		const visibilidadeMalha = new Uint8Array(malhas.length);
 		for (let m = 0; m < malhas.length; m++) {
+			visibilidadeMalha[m] = objetoVisivelNaCena(malhas[m].malha) ? 1 : 0;
+		}
+
+		// Projetar triângulos de cada malha visível
+		for (let m = 0; m < malhas.length; m++) {
+			if (visibilidadeMalha[m] === 0) continue;
 			const dados = malhas[m];
 			const mw = dados.malha.matrixWorld;
 			this.mvp.multiplyMatrices(this.viewProj, mw);
@@ -159,6 +199,7 @@ export class MotorVisibilidadeHlr {
 
 			const indices = dados.trisIndices;
 			const normais = dados.trisNormais;
+			const papeisConstrucao = dados.trisPapelConstrucao;
 			const numTris = indices.length / 3;
 			const temMascara = dados.mascara === 'direitaR';
 
@@ -178,7 +219,7 @@ export class MotorVisibilidadeHlr {
 				const z2 = proj[i2 * 3 + 2];
 
 				const denom = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
-				if (Math.abs(denom) < 1e-6) continue;
+				if (Math.abs(denom) < minDenomPx2) continue;
 
 				// Transformar normal local para mundo (suporta squash/escala não-uniforme)
 				this.tmpNormal
@@ -189,6 +230,7 @@ export class MotorVisibilidadeHlr {
 				tris.push({
 					malhaId: dados.id,
 					mascara: dados.mascara,
+					papelConstrucao: papeisConstrucao[t],
 					x0,
 					y0,
 					z0,
@@ -223,6 +265,7 @@ export class MotorVisibilidadeHlr {
 		const arestasProj: ArestaProjetada[] = [];
 
 		for (let m = 0; m < malhas.length; m++) {
+			if (visibilidadeMalha[m] === 0) continue;
 			const dados = malhas[m];
 			const mw = dados.malha.matrixWorld;
 			const wm = mw.elements;
@@ -245,7 +288,7 @@ export class MotorVisibilidadeHlr {
 				const x2 = (ndcX2 + 1) * meiaW;
 				const y2 = (1 - ndcY2) * meiaH;
 
-				if (Math.hypot(x2 - x1, y2 - y1) < MIN_COMP_2D_PX) continue;
+				if (Math.hypot(x2 - x1, y2 - y1) < minComp2dPx) continue;
 
 				atualizarLimites(x1, y1);
 				atualizarLimites(x2, y2);
@@ -291,6 +334,7 @@ export class MotorVisibilidadeHlr {
 					malhaId: dados.id,
 					mascara: dados.mascara,
 					ehConstrucao: false,
+					ehPonteW: false,
 					x1,
 					y1,
 					z1: ndcZ1,
@@ -318,23 +362,54 @@ export class MotorVisibilidadeHlr {
 			}
 		}
 
-		// Arestas de construção (em coordenadas fixas do cubo em espaço do mundo)
-		for (let i = 0; i < ARESTAS_CONSTRUCAO.length; i++) {
-			const c = ARESTAS_CONSTRUCAO[i];
-			const ndcX1 = vp[0] * c.ax + vp[4] * c.ay + vp[8] * c.az + vp[12];
-			const ndcY1 = vp[1] * c.ax + vp[5] * c.ay + vp[9] * c.az + vp[13];
-			const ndcZ1 = vp[2] * c.ax + vp[6] * c.ay + vp[10] * c.az + vp[14];
+		// Arestas de construção (com crescimento a partir dos asteriscos, pulso e matriz do cubo)
+		const arestasConstrucao = gerarArestasConstrucao(progressoConstrucao, progressoPonteW);
+		const cm = matConstrucao ? matConstrucao.elements : null;
+		for (let i = 0; i < arestasConstrucao.length; i++) {
+			const c = arestasConstrucao[i];
+			const lax = c.ax * pulsoConstrucao;
+			const lay = c.ay * pulsoConstrucao;
+			const laz = c.az * pulsoConstrucao;
+			const lbx = c.bx * pulsoConstrucao;
+			const lby = c.by * pulsoConstrucao;
+			const lbz = c.bz * pulsoConstrucao;
 
-			const ndcX2 = vp[0] * c.bx + vp[4] * c.by + vp[8] * c.bz + vp[12];
-			const ndcY2 = vp[1] * c.bx + vp[5] * c.by + vp[9] * c.bz + vp[13];
-			const ndcZ2 = vp[2] * c.bx + vp[6] * c.by + vp[10] * c.bz + vp[14];
+			let wax: number;
+			let way: number;
+			let waz: number;
+			let wbx: number;
+			let wby: number;
+			let wbz: number;
+			if (cm) {
+				wax = cm[0] * lax + cm[4] * lay + cm[8] * laz + cm[12];
+				way = cm[1] * lax + cm[5] * lay + cm[9] * laz + cm[13];
+				waz = cm[2] * lax + cm[6] * lay + cm[10] * laz + cm[14];
+				wbx = cm[0] * lbx + cm[4] * lby + cm[8] * lbz + cm[12];
+				wby = cm[1] * lbx + cm[5] * lby + cm[9] * lbz + cm[13];
+				wbz = cm[2] * lbx + cm[6] * lby + cm[10] * lbz + cm[14];
+			} else {
+				wax = lax;
+				way = lay;
+				waz = laz;
+				wbx = lbx;
+				wby = lby;
+				wbz = lbz;
+			}
+
+			const ndcX1 = vp[0] * wax + vp[4] * way + vp[8] * waz + vp[12];
+			const ndcY1 = vp[1] * wax + vp[5] * way + vp[9] * waz + vp[13];
+			const ndcZ1 = vp[2] * wax + vp[6] * way + vp[10] * waz + vp[14];
+
+			const ndcX2 = vp[0] * wbx + vp[4] * wby + vp[8] * wbz + vp[12];
+			const ndcY2 = vp[1] * wbx + vp[5] * wby + vp[9] * wbz + vp[13];
+			const ndcZ2 = vp[2] * wbx + vp[6] * wby + vp[10] * wbz + vp[14];
 
 			const x1 = (ndcX1 + 1) * meiaW;
 			const y1 = (1 - ndcY1) * meiaH;
 			const x2 = (ndcX2 + 1) * meiaW;
 			const y2 = (1 - ndcY2) * meiaH;
 
-			if (Math.hypot(x2 - x1, y2 - y1) < MIN_COMP_2D_PX) continue;
+			if (Math.hypot(x2 - x1, y2 - y1) < minComp2dPx) continue;
 
 			atualizarLimites(x1, y1);
 			atualizarLimites(x2, y2);
@@ -342,6 +417,7 @@ export class MotorVisibilidadeHlr {
 			arestasProj.push({
 				malhaId: -1,
 				ehConstrucao: true,
+				ehPonteW: Boolean(c.ehPonteW),
 				x1,
 				y1,
 				z1: ndcZ1,
@@ -352,12 +428,12 @@ export class MotorVisibilidadeHlr {
 				minY: y1 < y2 ? y1 : y2,
 				maxX: x1 > x2 ? x1 : x2,
 				maxY: y1 > y2 ? y1 : y2,
-				wax: c.ax,
-				way: c.ay,
-				waz: c.az,
-				wbx: c.bx,
-				wby: c.by,
-				wbz: c.bz,
+				wax,
+				way,
+				waz,
+				wbx,
+				wby,
+				wbz,
 				local: null,
 				n1x: 0,
 				n1y: 0,
@@ -373,12 +449,13 @@ export class MotorVisibilidadeHlr {
 		}
 
 		// 3. Popular grades espaciais 2D (32×32) para triângulos e arestas
-		cenaMinX -= 2;
-		cenaMinY -= 2;
-		cenaMaxX += 2;
-		cenaMaxY += 2;
-		const invSpanX = GRADE_DIM / Math.max(1, cenaMaxX - cenaMinX);
-		const invSpanY = GRADE_DIM / Math.max(1, cenaMaxY - cenaMinY);
+		const margemGrade = 2 * escalaCubo;
+		cenaMinX -= margemGrade;
+		cenaMinY -= margemGrade;
+		cenaMaxX += margemGrade;
+		cenaMaxY += margemGrade;
+		const invSpanX = GRADE_DIM / Math.max(0.1, cenaMaxX - cenaMinX);
+		const invSpanY = GRADE_DIM / Math.max(0.1, cenaMaxY - cenaMinY);
 
 		const totalCelulas = GRADE_DIM * GRADE_DIM;
 		for (let i = 0; i < totalCelulas; i++) {
@@ -459,10 +536,10 @@ export class MotorVisibilidadeHlr {
 
 						const b = arestasProj[j];
 						if (
-							a.maxX + TOL_COLINEAR_CORTE_PX < b.minX ||
-							b.maxX + TOL_COLINEAR_CORTE_PX < a.minX ||
-							a.maxY + TOL_COLINEAR_CORTE_PX < b.minY ||
-							b.maxY + TOL_COLINEAR_CORTE_PX < a.minY
+							a.maxX + tolColinearCortePx < b.minX ||
+							b.maxX + tolColinearCortePx < a.minX ||
+							a.maxY + tolColinearCortePx < b.minY ||
+							b.maxY + tolColinearCortePx < a.minY
 						) {
 							continue;
 						}
@@ -471,7 +548,7 @@ export class MotorVisibilidadeHlr {
 						const dby = b.y2 - b.y1;
 						const denom = dax * dby - day * dbx;
 
-						if (Math.abs(denom) > 1e-6) {
+						if (Math.abs(denom) > minDenomPx2) {
 							const qpx = b.x1 - a.x1;
 							const qpy = b.y1 - a.y1;
 							const t = (qpx * dby - qpy * dbx) / denom;
@@ -484,7 +561,7 @@ export class MotorVisibilidadeHlr {
 						} else {
 							// Segmentos paralelos: se colineares, corta nos extremos internos
 							const perp = Math.abs((b.x1 - a.x1) * day - (b.y1 - a.y1) * dax) * invLenA;
-							if (perp <= TOL_COLINEAR_CORTE_PX) {
+							if (perp <= tolColinearCortePx) {
 								const t1 = ((b.x1 - a.x1) * dax + (b.y1 - a.y1) * day) / lenA2;
 								const t2 = ((b.x2 - a.x1) * dax + (b.y2 - a.y1) * day) / lenA2;
 								if (t1 > 1e-4 && t1 < 1 - 1e-4) cortesA.push(t1);
@@ -527,7 +604,12 @@ export class MotorVisibilidadeHlr {
 			for (let k = 0; k < lista.length; k++) {
 				const tri = tris[lista[k]];
 				if (tri.malhaId === malhaIdPropria) continue;
-				if (sx < tri.minX - 0.1 || sx > tri.maxX + 0.1 || sy < tri.minY - 0.1 || sy > tri.maxY + 0.1) {
+				if (
+					sx < tri.minX - margemBboxTriPx ||
+					sx > tri.maxX + margemBboxTriPx ||
+					sy < tri.minY - margemBboxTriPx ||
+					sy > tri.maxY + margemBboxTriPx
+				) {
 					continue;
 				}
 				const dotN = tri.nx * fnx + tri.ny * fny + tri.nz * fnz;
@@ -541,7 +623,7 @@ export class MotorVisibilidadeHlr {
 				if (w2 < -1e-4) continue;
 
 				const zTri = w0 * tri.z0 + w1 * tri.z1 + w2 * tri.z2;
-				if (Math.abs(zTri - ndcZ) > EPS_PLANO_EMENDA_NDC) continue;
+				if (Math.abs(zTri - ndcZ) > epsPlanoEmendaNdc) continue;
 
 				if (tri.mascara === 'direitaR') {
 					const lx = w0 * tri.lx0 + w1 * tri.lx1 + w2 * tri.lx2;
@@ -554,8 +636,46 @@ export class MotorVisibilidadeHlr {
 			return false;
 		};
 
-		// Helper: testa se o ponto projetado (mx, my, mz) está ocluído por algum triângulo frontal
-		const pontoOcluido = (mx: number, my: number, mz: number): boolean => {
+		// Verifica se a malha do W está geometricamente encaixada na reta superior frontal
+		// da ponte de construção (tolerância ~1,5 px em escala 1): somente nesse caso o chanfro
+		// lateral interno da haste esquerda do W fica atrás do vão e libera a ponte em 3D.
+		let wPonteAlinhada = false;
+		const tolAlinhamentoW = 0.004 * escalaCubo;
+		const tolAlinhamentoW2 = tolAlinhamentoW * tolAlinhamentoW;
+		for (let m = 0; m < malhas.length; m++) {
+			if (visibilidadeMalha[m] === 0) continue;
+			const dados = malhas[m];
+			if (dados.malha.name !== 'malha-w') continue;
+			const wm = dados.malha.matrixWorld.elements;
+			// Quina superior frontal interna da haste esquerda do W: (-0.2775, 0.5, 0.5)
+			const wx = wm[0] * -0.2775 + wm[4] * 0.5 + wm[8] * 0.5 + wm[12];
+			const wy = wm[1] * -0.2775 + wm[5] * 0.5 + wm[9] * 0.5 + wm[13];
+			const wz = wm[2] * -0.2775 + wm[6] * 0.5 + wm[10] * 0.5 + wm[14];
+			const lx = -0.2775 * pulsoConstrucao;
+			const ly = 0.5 * pulsoConstrucao;
+			const lz = 0.5 * pulsoConstrucao;
+			const cx = cm ? cm[0] * lx + cm[4] * ly + cm[8] * lz + cm[12] : lx;
+			const cy = cm ? cm[1] * lx + cm[5] * ly + cm[9] * lz + cm[13] : ly;
+			const cz = cm ? cm[2] * lx + cm[6] * ly + cm[10] * lz + cm[14] : lz;
+			const dx = wx - cx;
+			const dy = wy - cy;
+			const dz = wz - cz;
+			wPonteAlinhada = dx * dx + dy * dy + dz * dz <= tolAlinhamentoW2;
+			break;
+		}
+
+		// Helper: testa se o ponto projetado (mx, my, mz) está ocluído por algum triângulo frontal.
+		// Para linhas de construção, qualquer face sólida que cubra o ponto em 2D oclui a linha
+		// (independentemente da profundidade Z), exceto para a ponte sobre o vão aberto do W
+		// (`ehPonteW`) projetada sobre a parede interna do quarto (ou sobre o chanfro lateral
+		// interno do W já encaixado), onde vale o teste de profundidade 3D ortográfico.
+		const pontoOcluido = (
+			mx: number,
+			my: number,
+			mz: number,
+			ehConstrucao: boolean,
+			ehPonteW: boolean,
+		): boolean => {
 			const cx = clampCel(Math.floor((mx - cenaMinX) * invSpanX));
 			const cy = clampCel(Math.floor((my - cenaMinY) * invSpanY));
 			const lista = this.gradeTris[cy * GRADE_DIM + cx];
@@ -571,8 +691,17 @@ export class MotorVisibilidadeHlr {
 				const w2 = 1 - w0 - w1;
 				if (w2 < -1e-5) continue;
 
-				const zTri = w0 * tri.z0 + w1 * tri.z1 + w2 * tri.z2;
-				if (zTri >= mz - EPS_OCLUSAO_NDC) continue;
+				const usarTesteProfundidade3D =
+					!ehConstrucao ||
+					(ehPonteW &&
+						(tri.papelConstrucao === PAPEL_OCLUSAO_CONSTRUCAO.PAREDE_INTERNA_QUARTO ||
+							(tri.papelConstrucao === PAPEL_OCLUSAO_CONSTRUCAO.CHANFRO_INTERNO_W &&
+								wPonteAlinhada)));
+
+				if (usarTesteProfundidade3D) {
+					const zTri = w0 * tri.z0 + w1 * tri.z1 + w2 * tri.z2;
+					if (zTri >= mz - epsOclusaoNdc) continue;
+				}
 
 				if (tri.mascara === 'direitaR') {
 					const lx = w0 * tri.lx0 + w1 * tri.lx1 + w2 * tri.lx2;
@@ -645,7 +774,7 @@ export class MotorVisibilidadeHlr {
 			for (let k = 0; k < cortes.length - 1; k++) {
 				const t0 = cortes[k];
 				const t1 = cortes[k + 1];
-				if ((t1 - t0) * compTotal < MIN_COMP_2D_PX) continue;
+				if ((t1 - t0) * compTotal < minComp2dPx) continue;
 
 				const tMid = 0.5 * (t0 + t1);
 
@@ -670,9 +799,9 @@ export class MotorVisibilidadeHlr {
 
 					let ehEmenda = pontoEmFaceCoplanarVizinha(
 						ar.malhaId,
-						wx + ar.n2x * PASSO_EMENDA_MUNDO,
-						wy + ar.n2y * PASSO_EMENDA_MUNDO,
-						wz + ar.n2z * PASSO_EMENDA_MUNDO,
+						wx + ar.n2x * passoEmendaMundo,
+						wy + ar.n2y * passoEmendaMundo,
+						wz + ar.n2z * passoEmendaMundo,
 						ar.n1x,
 						ar.n1y,
 						ar.n1z,
@@ -681,9 +810,9 @@ export class MotorVisibilidadeHlr {
 					if (!ehEmenda && ar.local.n2Frontal) {
 						ehEmenda = pontoEmFaceCoplanarVizinha(
 							ar.malhaId,
-							wx + ar.n1x * PASSO_EMENDA_MUNDO,
-							wy + ar.n1y * PASSO_EMENDA_MUNDO,
-							wz + ar.n1z * PASSO_EMENDA_MUNDO,
+							wx + ar.n1x * passoEmendaMundo,
+							wy + ar.n1y * passoEmendaMundo,
+							wz + ar.n1z * passoEmendaMundo,
 							ar.n2x,
 							ar.n2y,
 							ar.n2z,
@@ -692,8 +821,8 @@ export class MotorVisibilidadeHlr {
 					if (ehEmenda) continue;
 				}
 
-				// 5c. Teste de oclusão ortográfica contra os triângulos frontais
-				if (pontoOcluido(mx, my, mz)) continue;
+				// 5c. Teste de oclusão contra os triângulos frontais (2D para construção, 3D para contorno/ponte no vão)
+				if (pontoOcluido(mx, my, mz, ar.ehConstrucao, ar.ehPonteW)) continue;
 
 				const seg: Segmento2D = {
 					x1: ar.x1 + dx * t0,

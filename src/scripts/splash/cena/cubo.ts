@@ -1,16 +1,18 @@
 import * as THREE from 'three';
 import { atualizarEnquadramentoCamera, criarCameraCubo } from './camera';
 import { criarLinhasHLR, type LinhasHLR } from './linhas';
-import { criarLuzCena } from './luz';
+import { criarLuzCena, type LuzCena } from './luz';
 import { criarPecasCubo, type PecasCubo } from './pecas';
 
 export type { LinhasHLR } from './linhas';
+export type { LuzCena } from './luz';
 export type { PecasCubo } from './pecas';
 
 export interface CenaCubo {
 	renderer: THREE.WebGLRenderer;
 	scene: THREE.Scene;
 	camera: THREE.OrthographicCamera;
+	luz: LuzCena;
 	pecas: PecasCubo;
 	linhas: LinhasHLR;
 	renderizar: () => void;
@@ -87,6 +89,7 @@ export function criarCena(canvas: HTMLCanvasElement, svgLinhas: SVGSVGElement): 
 		renderer,
 		scene,
 		camera,
+		luz,
 		pecas: construcao.pecas,
 		linhas,
 		renderizar,

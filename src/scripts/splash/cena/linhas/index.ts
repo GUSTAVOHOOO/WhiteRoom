@@ -8,10 +8,10 @@ import {
 	subtrairCoincidentesComContorno,
 } from './encadear';
 import { criarCamadaSvgHlr, polilinhasParaPathD } from './svg';
-import type { DadosMalhaHlr, LinhasHLR } from './tipos';
-import { MotorVisibilidadeHlr } from './visibilidade';
+import type { DadosMalhaHlr, EstadoAnimacaoHlr, LinhasHLR } from './tipos';
+import { MotorVisibilidadeHlr, objetoVisivelNaCena } from './visibilidade';
 
-export type { LinhasHLR, MetadadosMalhaHlr, TipoMascaraHlr } from './tipos';
+export type { EstadoAnimacaoHlr, LinhasHLR, MetadadosMalhaHlr, TipoMascaraHlr } from './tipos';
 
 /**
  * Cria o pipeline completo de linhas vetoriais com remoção de linhas ocultas (HLR)
@@ -55,15 +55,52 @@ export function criarLinhasHLR(
 	let dimensoesDefinidas = false;
 	let destruido = false;
 
-	// Cache de pose por malha (16 floats de matrixWorld por malha) + viewport
+	// Estado dinâmico da animação (padrão = pose estática da T2)
+	const estadoAnimacao: Required<EstadoAnimacaoHlr> = {
+		progressoConstrucao: 1,
+		progressoPonteW: 1,
+		pulsoConstrucao: 1,
+		matrizConstrucao: null,
+		escalaCubo: 1,
+	};
+
+	// Cache de pose por malha (16 floats de matrixWorld + visibilidade) + viewport + estado
 	const cacheMatrizes = new Float64Array(malhas.length * 16);
+	const cacheVisivel = new Uint8Array(malhas.length);
+	const cacheMatConstrucao = new Float64Array(16);
 	let cacheValido = false;
 	let cacheLargura = -1;
 	let cacheAltura = -1;
+	let cacheProgresso = -1;
+	let cacheProgressoPonteW = -1;
+	let cachePulso = -1;
+	let cacheEscala = -1;
+	let cacheTemMatConstrucao = false;
 
 	const poseMudou = (w: number, h: number): boolean => {
-		if (!cacheValido || w !== cacheLargura || h !== cacheAltura) return true;
+		if (
+			!cacheValido ||
+			w !== cacheLargura ||
+			h !== cacheAltura ||
+			estadoAnimacao.progressoConstrucao !== cacheProgresso ||
+			estadoAnimacao.progressoPonteW !== cacheProgressoPonteW ||
+			estadoAnimacao.pulsoConstrucao !== cachePulso ||
+			estadoAnimacao.escalaCubo !== cacheEscala
+		) {
+			return true;
+		}
+		const temMat = estadoAnimacao.matrizConstrucao !== null;
+		if (temMat !== cacheTemMatConstrucao) return true;
+		if (temMat && estadoAnimacao.matrizConstrucao) {
+			const mc = estadoAnimacao.matrizConstrucao.elements;
+			for (let k = 0; k < 16; k++) {
+				if (cacheMatConstrucao[k] !== mc[k]) return true;
+			}
+		}
 		for (let m = 0; m < malhas.length; m++) {
+			const vis = objetoVisivelNaCena(malhas[m].malha) ? 1 : 0;
+			if (cacheVisivel[m] !== vis) return true;
+			if (vis === 0) continue;
 			const e = malhas[m].malha.matrixWorld.elements;
 			const off = m * 16;
 			for (let k = 0; k < 16; k++) {
@@ -76,7 +113,20 @@ export function criarLinhasHLR(
 	const salvarCache = (w: number, h: number): void => {
 		cacheLargura = w;
 		cacheAltura = h;
+		cacheProgresso = estadoAnimacao.progressoConstrucao;
+		cacheProgressoPonteW = estadoAnimacao.progressoPonteW;
+		cachePulso = estadoAnimacao.pulsoConstrucao;
+		cacheEscala = estadoAnimacao.escalaCubo;
+		cacheTemMatConstrucao = estadoAnimacao.matrizConstrucao !== null;
+		if (estadoAnimacao.matrizConstrucao) {
+			const mc = estadoAnimacao.matrizConstrucao.elements;
+			for (let k = 0; k < 16; k++) {
+				cacheMatConstrucao[k] = mc[k];
+			}
+		}
 		for (let m = 0; m < malhas.length; m++) {
+			const vis = objetoVisivelNaCena(malhas[m].malha) ? 1 : 0;
+			cacheVisivel[m] = vis;
 			const e = malhas[m].malha.matrixWorld.elements;
 			const off = m * 16;
 			for (let k = 0; k < 16; k++) {
@@ -92,6 +142,24 @@ export function criarLinhasHLR(
 		dimensoesDefinidas = true;
 	};
 
+	const definirEstadoAnimacao = (estado: EstadoAnimacaoHlr): void => {
+		if (estado.progressoConstrucao !== undefined) {
+			estadoAnimacao.progressoConstrucao = estado.progressoConstrucao;
+		}
+		if (estado.progressoPonteW !== undefined) {
+			estadoAnimacao.progressoPonteW = estado.progressoPonteW;
+		}
+		if (estado.pulsoConstrucao !== undefined) {
+			estadoAnimacao.pulsoConstrucao = estado.pulsoConstrucao;
+		}
+		if (estado.matrizConstrucao !== undefined) {
+			estadoAnimacao.matrizConstrucao = estado.matrizConstrucao;
+		}
+		if (estado.escalaCubo !== undefined) {
+			estadoAnimacao.escalaCubo = estado.escalaCubo;
+		}
+	};
+
 	const atualizar = (): void => {
 		if (destruido) return;
 
@@ -103,22 +171,27 @@ export function criarLinhasHLR(
 			}
 		}
 
-		// Garante matrixWorld atualizada das 3 peças e da câmera
+		// Garante matrixWorld atualizada das 3 peças (incluindo ancestrais) e da câmera
 		camera.updateMatrixWorld();
 		for (const grupo of grupos) {
-			grupo.updateMatrixWorld(true);
+			grupo.updateWorldMatrix(true, true);
 		}
 
 		if (!poseMudou(larguraAtual, alturaAtual)) return;
 		salvarCache(larguraAtual, alturaAtual);
 
-		const vis = motor.calcular(malhas, camera, larguraAtual, alturaAtual);
+		const escala = estadoAnimacao.escalaCubo;
+		const vis = motor.calcular(malhas, camera, larguraAtual, alturaAtual, estadoAnimacao);
 
-		const segsContorno = deduplicarEFundirColineares(vis.contorno);
-		const segsConstrucaoBrutos = deduplicarEFundirColineares(vis.construcao);
-		const segsConstrucao = subtrairCoincidentesComContorno(segsConstrucaoBrutos, segsContorno);
+		const segsContorno = deduplicarEFundirColineares(vis.contorno, undefined, escala);
+		const segsConstrucaoBrutos = deduplicarEFundirColineares(vis.construcao, undefined, escala);
+		const segsConstrucao = subtrairCoincidentesComContorno(
+			segsConstrucaoBrutos,
+			segsContorno,
+			escala,
+		);
 
-		const poliContorno = encadearEmPolilinhas(segsContorno);
+		const poliContorno = encadearEmPolilinhas(segsContorno, escala);
 		// Linhas de construção já foram fundidas por reta suporte: emitir como segmentos retos
 		// puros evita soldagem/média de vértices (que entortava hastes) e junções miter entre hastes.
 		const poliConstrucao = segsConstrucao.map((s) => ({
@@ -132,7 +205,7 @@ export function criarLinhasHLR(
 		const dConstrucao = polilinhasParaPathD(poliConstrucao);
 		const dContorno = polilinhasParaPathD(poliContorno);
 
-		camadaSvg.escrever(larguraAtual, alturaAtual, dConstrucao, dContorno);
+		camadaSvg.escrever(larguraAtual, alturaAtual, dConstrucao, dContorno, escala);
 	};
 
 	const paraSvgString = (): string => {
@@ -151,6 +224,7 @@ export function criarLinhasHLR(
 	return {
 		atualizar,
 		definirDimensoes,
+		definirEstadoAnimacao,
 		paraSvgString,
 		destruir,
 	};
