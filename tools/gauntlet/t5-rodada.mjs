@@ -221,38 +221,76 @@ async function gerarFolhaFavicon(dirSaida) {
 	const png16 = entries.find((e) => e.width === 16)?.png;
 	const png32 = entries.find((e) => e.width === 32)?.png;
 	const png48 = entries.find((e) => e.width === 48)?.png;
+	const svgFavicon = fs.readFileSync(path.join(PUBLIC_DIR, 'favicon.svg'), 'utf8');
+	const png16Svg = await sharp(Buffer.from(svgFavicon.replace('<svg ', '<svg width="16" height="16" ')))
+		.resize(16, 16)
+		.png()
+		.toBuffer();
 	const png180 = fs.readFileSync(path.join(PUBLIC_DIR, 'apple-touch-icon.png'));
+	const png192 = fs.readFileSync(path.join(PUBLIC_DIR, 'icon-192.png'));
 	const png512 = fs.readFileSync(path.join(PUBLIC_DIR, 'icon-512.png'));
+	const pngMaskable512 = fs.readFileSync(path.join(PUBLIC_DIR, 'icon-maskable-512.png'));
 
 	const itens = [
 		{ label: '16 px (4×)', buf: png16, dispW: 64, dispH: 64, kernel: 'nearest' },
 		{ label: '32 px (4×)', buf: png32, dispW: 128, dispH: 128, kernel: 'nearest' },
 		{ label: '48 px (4×)', buf: png48, dispW: 192, dispH: 192, kernel: 'nearest' },
 		{ label: '180 px (1×)', buf: png180, dispW: 180, dispH: 180, kernel: 'lanczos3' },
-		{ label: '512 px (0,4×)', buf: png512, dispW: 205, dispH: 205, kernel: 'lanczos3' },
+		{ label: '192 px any (1×)', buf: png192, dispW: 192, dispH: 192, kernel: 'lanczos3' },
+		{ label: '512 px any (0,375×)', buf: png512, dispW: 192, dispH: 192, kernel: 'lanczos3' },
+		{ label: '512 maskable (0,375×)', buf: pngMaskable512, dispW: 192, dispH: 192, kernel: 'lanczos3' },
 	];
 
 	const pad = 18;
-	const innerPad = 18;
+	const gap = 20;
+	const innerPad = 22;
 	const tituloH = 44;
 	const rowHeaderH = 28;
+	const tabStripH = 52;
 	const itemLabelH = 22;
-	const rowBoxH = 228;
-	const faixaW = innerPad + itens.reduce((acc, it) => acc + it.dispW + pad, 0) - pad + innerPad;
+	const iconsBoxH = 226;
+	const rowBoxH = tabStripH + iconsBoxH;
+	const faixaW = innerPad * 2 + itens.reduce((acc, it) => acc + it.dispW, 0) + gap * (itens.length - 1);
 	const totalW = pad * 2 + faixaW;
-	const totalH = tituloH + pad + 2 * (rowHeaderH + rowBoxH + pad);
 
 	const fundos = [
-		{ titulo: 'Sobre fundo claro (#FAFAF8)', rgb: { r: 250, g: 250, b: 248, alpha: 1 }, textoCor: '#171717' },
-		{ titulo: 'Sobre fundo escuro (#202124)', rgb: { r: 32, g: 33, b: 36, alpha: 1 }, textoCor: '#FAFAF8' },
+		{
+			titulo: 'Sobre fundo claro (#FAFAF8)',
+			rgb: { r: 250, g: 250, b: 248, alpha: 1 },
+			textoCor: '#171717',
+			tabBarBg: '#EAEAE6',
+			tabAtivaBg: '#FAFAF8',
+			tabBorda: '#D8D7D2',
+			tabMuted: '#6E6E6A',
+		},
+		{
+			titulo: 'Sobre fundo branco (#FFFFFF)',
+			rgb: { r: 255, g: 255, b: 255, alpha: 1 },
+			textoCor: '#171717',
+			tabBarBg: '#EEF0F2',
+			tabAtivaBg: '#FFFFFF',
+			tabBorda: '#DADCE0',
+			tabMuted: '#5F6368',
+		},
+		{
+			titulo: 'Sobre fundo escuro (#202124)',
+			rgb: { r: 32, g: 33, b: 36, alpha: 1 },
+			textoCor: '#FAFAF8',
+			tabBarBg: '#17181A',
+			tabAtivaBg: '#202124',
+			tabBorda: '#3C4043',
+			tabMuted: '#9AA0A6',
+		},
 	];
+
+	const totalH = tituloH + pad + fundos.length * (rowHeaderH + rowBoxH + pad);
 
 	const composites = [
 		{
 			input: criarEtiquetaSvg(
 				totalW,
 				tituloH,
-				`T5 Rodada ${rodada} — Favicons e Ícones (16, 32, 48 px em 4× nearest-neighbor · 180 e 512 px)`,
+				`T5 Rodada ${rodada} — Favicons (16/32/48 em 4× nearest), Ícones (180, 192, 512, maskable 512) e Simulação de Aba 16 px`,
 				'#171717',
 				'#FAFAF8',
 			),
@@ -264,26 +302,43 @@ async function gerarFolhaFavicon(dirSaida) {
 	let y = tituloH + pad;
 	for (const f of fundos) {
 		composites.push({
-			input: criarEtiquetaSvg(totalW - pad * 2, rowHeaderH, f.titulo, '#262624', '#FAFAF8'),
+			input: criarEtiquetaSvg(faixaW, rowHeaderH, f.titulo, '#262624', '#FAFAF8'),
 			left: pad,
 			top: y,
 		});
 		y += rowHeaderH;
 
 		const faixa = await sharp({
-			create: { width: totalW - pad * 2, height: rowBoxH, channels: 4, background: f.rgb },
+			create: { width: faixaW, height: rowBoxH, channels: 4, background: f.rgb },
 		})
 			.png()
 			.toBuffer();
 		composites.push({ input: faixa, left: pad, top: y });
 
+		// Simulação de aba de navegador (16 px ao lado do texto "WhiteRoom") — ICO 16 px e SVG 16 px
+		const tabBarSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${faixaW}" height="${tabStripH}">
+			<rect width="100%" height="100%" fill="${f.tabBarBg}"/>
+			<line x1="0" y1="${tabStripH - 0.5}" x2="${faixaW}" y2="${tabStripH - 0.5}" stroke="${f.tabBorda}" stroke-width="1"/>
+			<text x="${innerPad}" y="31" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" fill="${f.tabMuted}">Aba do navegador (16 px):</text>
+			<rect x="190" y="9" width="232" height="35" rx="8" fill="${f.tabAtivaBg}" stroke="${f.tabBorda}" stroke-width="1"/>
+			<text x="228" y="31" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="500" fill="${f.textoCor}">WhiteRoom</text>
+			<text x="404" y="31" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="${f.tabMuted}">×</text>
+			<rect x="434" y="9" width="256" height="35" rx="8" fill="${f.tabAtivaBg}" stroke="${f.tabBorda}" stroke-width="1"/>
+			<text x="472" y="31" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="500" fill="${f.textoCor}">WhiteRoom (favicon.svg)</text>
+			<text x="672" y="31" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="${f.tabMuted}">×</text>
+		</svg>`;
+		composites.push({ input: Buffer.from(tabBarSvg), left: pad, top: y });
+		composites.push({ input: png16, left: pad + 204, top: y + 19 });
+		composites.push({ input: png16Svg, left: pad + 448, top: y + 19 });
+
+		const yIcons = y + tabStripH;
 		let x = pad + innerPad;
 		for (const it of itens) {
 			const scaled = await sharp(it.buf)
 				.resize(it.dispW, it.dispH, { kernel: it.kernel })
 				.png()
 				.toBuffer();
-			const topImg = y + Math.round((rowBoxH - itemLabelH - it.dispH) / 2);
+			const topImg = yIcons + Math.round((iconsBoxH - itemLabelH - it.dispH) / 2);
 			composites.push({ input: scaled, left: x, top: topImg });
 			composites.push({
 				input: Buffer.from(
@@ -292,9 +347,9 @@ async function gerarFolhaFavicon(dirSaida) {
 					</svg>`,
 				),
 				left: x,
-				top: y + rowBoxH - itemLabelH - 4,
+				top: yIcons + iconsBoxH - itemLabelH - 4,
 			});
-			x += it.dispW + pad;
+			x += it.dispW + gap;
 		}
 
 		y += rowBoxH + pad;
@@ -503,6 +558,7 @@ try {
 		{ nome: 'apple-touch-icon.png', caminho: path.join(PUBLIC_DIR, 'apple-touch-icon.png'), esperado: gerado.appleTouch180 },
 		{ nome: 'icon-192.png', caminho: path.join(PUBLIC_DIR, 'icon-192.png'), esperado: gerado.icon192 },
 		{ nome: 'icon-512.png', caminho: path.join(PUBLIC_DIR, 'icon-512.png'), esperado: gerado.icon512 },
+		{ nome: 'icon-maskable-512.png', caminho: path.join(PUBLIC_DIR, 'icon-maskable-512.png'), esperado: gerado.iconMaskable512 },
 		{ nome: 'site.webmanifest', caminho: path.join(PUBLIC_DIR, 'site.webmanifest'), esperado: Buffer.from(gerado.siteWebmanifest, 'utf8') },
 	];
 
@@ -1615,6 +1671,7 @@ try {
 				'/apple-touch-icon.png',
 				'/icon-192.png',
 				'/icon-512.png',
+				'/icon-maskable-512.png',
 				'/site.webmanifest',
 			];
 			const respostasHttp = {};
@@ -1635,14 +1692,41 @@ try {
 			const icoTamanhos = icoEntries.map((e) => e.width).sort((a, b) => a - b);
 			const icoOk = JSON.stringify(icoTamanhos) === JSON.stringify([16, 32, 48]);
 
+			const faviconSvgDisk = fs.readFileSync(path.join(PUBLIC_DIR, 'favicon.svg'), 'utf8');
+			const semPrefersColorScheme = !/prefers-color-scheme/i.test(faviconSvgDisk);
+
+			const alphaCanto = async (bufOrPath) => {
+				const raw = await sharp(bufOrPath).ensureAlpha().raw().toBuffer();
+				return raw[3];
+			};
+			const cantos = {
+				ico16Alpha0: await alphaCanto(icoEntries.find((e) => e.width === 16).png),
+				ico32Alpha0: await alphaCanto(icoEntries.find((e) => e.width === 32).png),
+				ico48Alpha0: await alphaCanto(icoEntries.find((e) => e.width === 48).png),
+				icon192Alpha0: await alphaCanto(path.join(PUBLIC_DIR, 'icon-192.png')),
+				icon512Alpha0: await alphaCanto(path.join(PUBLIC_DIR, 'icon-512.png')),
+				apple180Alpha0: await alphaCanto(path.join(PUBLIC_DIR, 'apple-touch-icon.png')),
+				maskable512Alpha0: await alphaCanto(path.join(PUBLIC_DIR, 'icon-maskable-512.png')),
+			};
+			const cantosOk =
+				cantos.ico16Alpha0 === 0 &&
+				cantos.ico32Alpha0 === 0 &&
+				cantos.ico48Alpha0 === 0 &&
+				cantos.icon192Alpha0 === 0 &&
+				cantos.icon512Alpha0 === 0 &&
+				cantos.apple180Alpha0 === 255 &&
+				cantos.maskable512Alpha0 === 255;
+
 			const manifestObj = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'site.webmanifest'), 'utf8'));
+			const icons = Array.isArray(manifestObj.icons) ? manifestObj.icons : [];
 			const manifestOk =
 				manifestObj.name === 'WhiteRoom' &&
 				manifestObj.theme_color === '#FAFAF8' &&
 				manifestObj.background_color === '#FAFAF8' &&
 				manifestObj.display === 'browser' &&
-				Array.isArray(manifestObj.icons) &&
-				manifestObj.icons.length >= 2;
+				icons.some((i) => i.src === '/icon-192.png' && i.sizes === '192x192' && i.purpose === 'any') &&
+				icons.some((i) => i.src === '/icon-512.png' && i.sizes === '512x512' && i.purpose === 'any') &&
+				icons.some((i) => i.src === '/icon-maskable-512.png' && i.sizes === '512x512' && i.purpose === 'maskable');
 
 			const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 			const page = await context.newPage();
@@ -1666,10 +1750,13 @@ try {
 				headLinks.temManifest;
 
 			faviconResumo = {
-				ok: todos200 && icoOk && manifestOk && headOk,
+				ok: todos200 && icoOk && semPrefersColorScheme && cantosOk && manifestOk && headOk,
 				todos200,
 				icoTamanhos,
 				icoOk,
+				semPrefersColorScheme,
+				cantosOk,
+				cantos,
 				manifestOk,
 				headOk,
 				headLinks,
