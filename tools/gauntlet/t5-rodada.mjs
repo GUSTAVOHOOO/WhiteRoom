@@ -217,6 +217,8 @@ function extrairPngsDeIco(icoBuf) {
 
 const REF_R2_COMMIT = 'ce2d1c0';
 const REF_R3_COMMIT = '6ac384f';
+const REF_R4_COMMIT = '06becc5';
+const META_CONTRASTE_BORDA_BRANCO = 1.35;
 
 function carregarArquivoGit(ref, caminho) {
 	try {
@@ -242,6 +244,84 @@ function carregarPng16Git(ref) {
 
 function distRgbChebyshev(r1, g1, b1, r2, g2, b2) {
 	return Math.max(Math.abs(r1 - r2), Math.abs(g1 - g2), Math.abs(b1 - b2));
+}
+
+function luminanciaRelativa(r, g, b) {
+	const lin = (c) => {
+		const s = c / 255;
+		return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+	};
+	return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrasteContraBranco(r, g, b) {
+	const l = luminanciaRelativa(r, g, b);
+	return Number(((1.0 + 0.05) / (l + 0.05)).toFixed(2));
+}
+
+function rgbParaHex(r, g, b) {
+	return `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+/**
+ * Mede a cor média do anel da borda da placa sobre fundo branco `#FFFFFF` ao longo
+ * dos trechos retos (longe dos cantos arredondados) e calcula o contraste WCAG contra `#FFFFFF`.
+ */
+async function medirAnelBordaSobreBranco(pngBufOuPath, { lado, anelPx = 1, excluirTopoCentro = false }) {
+	const raw = await sharp(pngBufOuPath)
+		.flatten({ background: '#FFFFFF' })
+		.removeAlpha()
+		.raw()
+		.toBuffer();
+
+	const margemCanto = Math.max(4, Math.ceil(lado * 0.21) + 2);
+	const xIni = margemCanto;
+	const xFim = lado - 1 - margemCanto;
+	const yIni = margemCanto;
+	const yFim = lado - 1 - margemCanto;
+	const centro = lado / 2;
+
+	let sumR = 0;
+	let sumG = 0;
+	let sumB = 0;
+	let amostras = 0;
+
+	const amostrar = (x, y) => {
+		const o = (y * lado + x) * 3;
+		sumR += raw[o];
+		sumG += raw[o + 1];
+		sumB += raw[o + 2];
+		amostras++;
+	};
+
+	for (let k = 0; k < anelPx; k++) {
+		// Topo e base (trechos retos)
+		for (let x = xIni; x <= xFim; x++) {
+			if (!excluirTopoCentro || Math.abs(x + 0.5 - centro) > 1.5) {
+				amostrar(x, k);
+			}
+			amostrar(x, lado - 1 - k);
+		}
+		// Esquerda e direita (trechos retos)
+		for (let y = yIni; y <= yFim; y++) {
+			amostrar(k, y);
+			amostrar(lado - 1 - k, y);
+		}
+	}
+
+	const rMed = sumR / amostras;
+	const gMed = sumG / amostras;
+	const bMed = sumB / amostras;
+	const contrasteBranco = contrasteContraBranco(rMed, gMed, bMed);
+	return {
+		hexMedio: rgbParaHex(rMed, gMed, bMed),
+		rgbMedio: [Number(rMed.toFixed(1)), Number(gMed.toFixed(1)), Number(bMed.toFixed(1))],
+		contrasteBranco,
+		metaContraste: META_CONTRASTE_BORDA_BRANCO,
+		anelPx,
+		amostras,
+		ok: contrasteBranco >= META_CONTRASTE_BORDA_BRANCO,
+	};
 }
 
 /**
@@ -403,7 +483,7 @@ async function gerarFolhaFavicon(dirSaida, chromiumRenders) {
 	const compFundos = [
 		{
 			chave: 'branco',
-			titulo: `Comparação Chromium (dpr 1) em #FFFFFF — 16 px (8× nearest) e 32 px (4× nearest): R2 SVG, R3 SVG, R${rodada} SVG e R3 ICO 16`,
+			titulo: `Comparação Chromium (dpr 1) em #FFFFFF — Rodada 4 vs Rodada ${rodada}: 16 px (8× nearest) e 32 px (4× nearest)`,
 			bgHex: '#FFFFFF',
 			corTexto: '#171717',
 			corMuted: '#5F6368',
@@ -411,7 +491,7 @@ async function gerarFolhaFavicon(dirSaida, chromiumRenders) {
 		},
 		{
 			chave: 'escuro',
-			titulo: `Comparação Chromium (dpr 1) em #202124 — 16 px (8× nearest) e 32 px (4× nearest): R2 SVG, R3 SVG, R${rodada} SVG e R3 ICO 16`,
+			titulo: `Comparação Chromium (dpr 1) em #202124 — Rodada 4 vs Rodada ${rodada}: 16 px (8× nearest) e 32 px (4× nearest)`,
 			bgHex: '#202124',
 			corTexto: '#FAFAF8',
 			corMuted: '#9AA0A6',
@@ -468,8 +548,8 @@ async function gerarFolhaFavicon(dirSaida, chromiumRenders) {
 			<text x="706" y="31" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="${f.tabMuted}">×</text>
 		</svg>`;
 		composites.push({ input: Buffer.from(tabBarSvg), left: pad, top: y });
-		composites.push({ input: chromiumRenders.ico16R3[f.chave], left: pad + 204, top: y + 19 });
-		composites.push({ input: chromiumRenders.svgR4_16[f.chave], left: pad + 448, top: y + 19 });
+		composites.push({ input: chromiumRenders.ico16Atual[f.chave], left: pad + 204, top: y + 19 });
+		composites.push({ input: chromiumRenders.svgAtual_16[f.chave], left: pad + 448, top: y + 19 });
 
 		const yIcons = y + tabStripH;
 		let x = pad + innerPad;
@@ -520,15 +600,15 @@ async function gerarFolhaFavicon(dirSaida, chromiumRenders) {
 		composites.push({ input: Buffer.from(painelSvg), left: pad, top: y });
 
 		const slots16 = [
-			{ buf: chromiumRenders.svgR2_16[cf.chave], label: 'R2 · favicon.svg 16 (8×)' },
-			{ buf: chromiumRenders.svgR3_16[cf.chave], label: 'R3 · favicon.svg 16 (8×)' },
-			{ buf: chromiumRenders.svgR4_16[cf.chave], label: `R${rodada} · favicon.svg 16 (8×)` },
-			{ buf: chromiumRenders.ico16R3[cf.chave], label: 'R3 · ICO 16 (8×)' },
+			{ buf: chromiumRenders.svgR4_16[cf.chave], label: 'R4 · favicon.svg 16 (8×)' },
+			{ buf: chromiumRenders.svgAtual_16[cf.chave], label: `R${rodada} · favicon.svg 16 (8×)` },
+			{ buf: chromiumRenders.ico16R4[cf.chave], label: 'R4 · ICO 16 (8×)' },
+			{ buf: chromiumRenders.ico16Atual[cf.chave], label: `R${rodada} · ICO 16 (8×)` },
 		];
 		const slots32 = [
-			{ buf: chromiumRenders.svgR2_32[cf.chave], label: 'R2 · favicon.svg 32 (4×)' },
-			{ buf: chromiumRenders.svgR3_32[cf.chave], label: 'R3 · favicon.svg 32 (4×)' },
-			{ buf: chromiumRenders.svgR4_32[cf.chave], label: `R${rodada} · favicon.svg 32 (4×)` },
+			{ buf: chromiumRenders.svgR4_32[cf.chave], label: 'R4 · favicon.svg 32 (4×)' },
+			{ buf: chromiumRenders.svgAtual_32[cf.chave], label: `R${rodada} · favicon.svg 32 (4×)` },
+			{ buf: chromiumRenders.ico32Atual[cf.chave], label: `R${rodada} · ICO 32 (4×)` },
 		];
 
 		const desenharSlots = async (slots, xBase) => {
@@ -1899,13 +1979,34 @@ try {
 			const faviconSvgViewBox32 = /viewBox="0 0 32 32"/.test(faviconSvgDisk);
 			const semContornoSobreR = !/data-logo-camada="(?:contorno-r|espinha)"/.test(faviconSvgDisk);
 
-			// Verifica que a entrada 16×16 do ICO permanece bit-a-bit idêntica à rodada 3
+			// Verifica que todos os pixels do cubo na entrada 16×16 do ICO permanecem idênticos à rodada 3/4
 			const png16IcoAtual = icoEntries.find((e) => e.width === 16).png;
+			const png32IcoAtual = icoEntries.find((e) => e.width === 32).png;
 			const png16IcoR3 = carregarPng16Git(REF_R3_COMMIT);
-			const ico16IdenticoRodada3 = png16IcoR3 ? png16IcoAtual.equals(png16IcoR3) : true;
+			const png16IcoR4 = carregarPng16Git(REF_R4_COMMIT) ?? png16IcoR3;
 
 			// Auditoria pixel-a-pixel do 16×16 do ICO: R puro #CD9016, W puro #171717, aro #FFFFFF, furo e vão nítidos
 			const png16Raw = await sharp(png16IcoAtual).ensureAlpha().raw().toBuffer();
+			let ico16CuboDiffPx = 0;
+			if (png16IcoR3) {
+				const r3Raw = await sharp(png16IcoR3).ensureAlpha().raw().toBuffer();
+				const coresCubo = new Set(['#CD9016', '#171717', '#FFFFFF', '#C6C5C1']);
+				const hexDe = (buf, px, py) => {
+					const o = (py * 16 + px) * 4;
+					if (buf[o + 3] < 128) return null;
+					return `#${[buf[o], buf[o + 1], buf[o + 2]].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+				};
+				for (let py = 1; py <= 14; py++) {
+					for (let px = 1; px <= 14; px++) {
+						const hR3 = hexDe(r3Raw, px, py);
+						const hAt = hexDe(png16Raw, px, py);
+						if ((hR3 && coresCubo.has(hR3)) || (hAt && coresCubo.has(hAt))) {
+							if (hR3 !== hAt) ico16CuboDiffPx++;
+						}
+					}
+				}
+			}
+			const ico16CuboIdenticoRodada3 = ico16CuboDiffPx === 0;
 			const hexEm = (px, py) => {
 				const o = (py * 16 + px) * 4;
 				if (png16Raw[o + 3] < 128) return null;
@@ -1925,14 +2026,14 @@ try {
 					if (!h) continue;
 					if (h === '#FFFFFF' && py <= 7) pxTopoBrancos++;
 					if (px >= 8 && py >= 6 && py <= 14) {
-						if (h !== '#FAFAF8' && h !== '#FFFFFF' && h !== '#C6C5C1') {
+						if (h !== '#FAFAF8' && h !== '#FFFFFF' && h !== '#C6C5C1' && h !== '#D6D5D0') {
 							coresR.set(h, (coresR.get(h) ?? 0) + 1);
 						}
 						if (h === '#CD9016') pxRPuros++;
 						if (h === '#FAFAF8' && px >= 9 && px <= 12 && py >= 7 && py <= 9) pxFuroR++;
 					}
 					if (px >= 2 && px <= 7 && py >= 5 && py <= 14) {
-						if (h !== '#FAFAF8' && h !== '#FFFFFF' && h !== '#C6C5C1') {
+						if (h !== '#FAFAF8' && h !== '#FFFFFF' && h !== '#C6C5C1' && h !== '#D6D5D0') {
 							coresW.set(h, (coresW.get(h) ?? 0) + 1);
 						}
 						if (h === '#171717') pxWPuros++;
@@ -1945,7 +2046,7 @@ try {
 			const corDominanteW = [...coresW.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 			const pixelAudit16 = {
 				ok:
-					ico16IdenticoRodada3 &&
+					ico16CuboIdenticoRodada3 &&
 					corDominanteR === '#CD9016' &&
 					corDominanteW === '#171717' &&
 					pxRPuros >= 20 &&
@@ -1954,7 +2055,8 @@ try {
 					pxVaoWCol3 >= 3 &&
 					pxVaoWCol6 >= 3 &&
 					pxFuroR >= 3,
-				ico16IdenticoRodada3,
+				ico16CuboIdenticoRodada3,
+				ico16CuboDiffPx,
 				corDominanteR,
 				corDominanteW,
 				pxRPuros,
@@ -1968,14 +2070,18 @@ try {
 			// Renderização real no Chromium (dpr 1, <img> 16×16 e 32×32 em #FAFAF8, #FFFFFF e #202124)
 			const svgR2Buf = carregarArquivoGit(REF_R2_COMMIT, 'public/favicon.svg');
 			const svgR3Buf = carregarArquivoGit(REF_R3_COMMIT, 'public/favicon.svg');
+			const svgR4Buf = carregarArquivoGit(REF_R4_COMMIT, 'public/favicon.svg');
 			const toSvgUrl = (bufOrStr) =>
 				`data:image/svg+xml;base64,${(Buffer.isBuffer(bufOrStr) ? bufOrStr : Buffer.from(bufOrStr, 'utf8')).toString('base64')}`;
 			const toPngUrl = (buf) => `data:image/png;base64,${buf.toString('base64')}`;
 
 			const urlSvgR2 = svgR2Buf ? toSvgUrl(svgR2Buf) : null;
 			const urlSvgR3 = svgR3Buf ? toSvgUrl(svgR3Buf) : null;
-			const urlSvgR4 = toSvgUrl(faviconSvgDisk);
-			const urlIco16R3 = toPngUrl(png16IcoR3 ?? png16IcoAtual);
+			const urlSvgR4 = svgR4Buf ? toSvgUrl(svgR4Buf) : null;
+			const urlSvgAtual = toSvgUrl(faviconSvgDisk);
+			const urlIco16R4 = png16IcoR4 ? toPngUrl(png16IcoR4) : null;
+			const urlIco16Atual = toPngUrl(png16IcoAtual);
+			const urlIco32Atual = toPngUrl(png32IcoAtual);
 
 			const ctxFav = await browser.newContext({ viewport: { width: 128, height: 128 }, deviceScaleFactor: 1 });
 			const pageFav = await ctxFav.newPage();
@@ -2002,57 +2108,101 @@ try {
 
 			chromiumFaviconRenders = {
 				svgR2_16: await renderPorFundo(urlSvgR2, 16, fundos2),
-				svgR2_32: await renderPorFundo(urlSvgR2, 32, fundos2),
 				svgR3_16: await renderPorFundo(urlSvgR3, 16, fundos2),
-				svgR3_32: await renderPorFundo(urlSvgR3, 32, fundos2),
-				svgR4_16: await renderPorFundo(urlSvgR4, 16, fundos3),
+				svgR4_16: await renderPorFundo(urlSvgR4, 16, fundos2),
 				svgR4_32: await renderPorFundo(urlSvgR4, 32, fundos2),
-				ico16R3: await renderPorFundo(urlIco16R3, 16, fundos3),
+				svgAtual_16: await renderPorFundo(urlSvgAtual, 16, fundos3),
+				svgAtual_32: await renderPorFundo(urlSvgAtual, 32, fundos2),
+				ico16R4: await renderPorFundo(urlIco16R4, 16, fundos2),
+				ico16Atual: await renderPorFundo(urlIco16Atual, 16, fundos3),
+				ico32Atual: await renderPorFundo(urlIco32Atual, 32, fundos2),
 			};
 			await ctxFav.close();
 
-			const auditSvgR4_16Branco = await auditarPixels16Chromium(chromiumFaviconRenders.svgR4_16.branco);
-			const auditSvgR4_16Escuro = await auditarPixels16Chromium(chromiumFaviconRenders.svgR4_16.escuro);
+			const auditSvgAtual_16Branco = await auditarPixels16Chromium(chromiumFaviconRenders.svgAtual_16.branco);
+			const auditSvgAtual_16Escuro = await auditarPixels16Chromium(chromiumFaviconRenders.svgAtual_16.escuro);
+			const auditSvgR4_16Branco = chromiumFaviconRenders.svgR4_16.branco
+				? await auditarPixels16Chromium(chromiumFaviconRenders.svgR4_16.branco)
+				: null;
 			const auditSvgR3_16Branco = chromiumFaviconRenders.svgR3_16.branco
 				? await auditarPixels16Chromium(chromiumFaviconRenders.svgR3_16.branco)
 				: null;
 			const auditSvgR2_16Branco = chromiumFaviconRenders.svgR2_16.branco
 				? await auditarPixels16Chromium(chromiumFaviconRenders.svgR2_16.branco)
 				: null;
-			const auditIco16R3Branco = await auditarPixels16Chromium(chromiumFaviconRenders.ico16R3.branco);
-			const auditSvgR4_32Branco = await auditarPixels32Chromium(chromiumFaviconRenders.svgR4_32.branco);
+			const auditIco16AtualBranco = await auditarPixels16Chromium(chromiumFaviconRenders.ico16Atual.branco);
+			const auditSvgAtual_32Branco = await auditarPixels32Chromium(chromiumFaviconRenders.svgAtual_32.branco);
 
 			const pixelAuditSvg16Chromium = {
 				ok:
 					faviconSvgViewBox32 &&
 					semContornoSobreR &&
-					auditSvgR4_16Branco.pxProximosR >= 17 &&
-					auditSvgR4_16Branco.pxProximosW >= 22 &&
-					auditSvgR4_16Branco.pxProximosBranco >= 10 &&
-					auditSvgR4_16Branco.pxFuroR >= 3 &&
-					auditSvgR4_16Branco.pxVaoW >= 8 &&
-					auditSvgR4_32Branco.furoClaro32 >= 4 &&
-					auditSvgR4_32Branco.vaoWEsq32 >= 4 &&
-					auditSvgR4_32Branco.vaoWDir32 >= 4 &&
+					auditSvgAtual_16Branco.pxProximosR >= 17 &&
+					auditSvgAtual_16Branco.pxProximosW >= 22 &&
+					auditSvgAtual_16Branco.pxProximosBranco >= 10 &&
+					auditSvgAtual_16Branco.pxFuroR >= 3 &&
+					auditSvgAtual_16Branco.pxVaoW >= 8 &&
+					auditSvgAtual_32Branco.furoClaro32 >= 4 &&
+					auditSvgAtual_32Branco.vaoWEsq32 >= 4 &&
+					auditSvgAtual_32Branco.vaoWDir32 >= 4 &&
+					(!auditSvgR4_16Branco ||
+						(auditSvgAtual_16Branco.pxProximosR >= auditSvgR4_16Branco.pxProximosR &&
+							auditSvgAtual_16Branco.pxProximosW >= auditSvgR4_16Branco.pxProximosW &&
+							auditSvgAtual_16Branco.pxProximosBranco >= auditSvgR4_16Branco.pxProximosBranco)) &&
 					(!auditSvgR3_16Branco ||
-						(auditSvgR4_16Branco.pxProximosR > auditSvgR3_16Branco.pxProximosR &&
-							auditSvgR4_16Branco.pxProximosW > auditSvgR3_16Branco.pxProximosW &&
-							auditSvgR4_16Branco.pxProximosBranco > auditSvgR3_16Branco.pxProximosBranco)),
+						(auditSvgAtual_16Branco.pxProximosR > auditSvgR3_16Branco.pxProximosR &&
+							auditSvgAtual_16Branco.pxProximosW > auditSvgR3_16Branco.pxProximosW &&
+							auditSvgAtual_16Branco.pxProximosBranco > auditSvgR3_16Branco.pxProximosBranco)),
 				faviconSvgViewBox32,
 				semContornoSobreR,
-				atual16Branco: auditSvgR4_16Branco,
-				atual16Escuro: auditSvgR4_16Escuro,
-				atual32Branco: auditSvgR4_32Branco,
+				atual16Branco: auditSvgAtual_16Branco,
+				atual16Escuro: auditSvgAtual_16Escuro,
+				atual32Branco: auditSvgAtual_32Branco,
+				rodada4_16Branco: auditSvgR4_16Branco,
 				rodada3_16Branco: auditSvgR3_16Branco,
 				rodada2_16Branco: auditSvgR2_16Branco,
-				ico16Rodada3Branco: auditIco16R3Branco,
-				deltaVsRodada3: auditSvgR3_16Branco
+				ico16AtualBranco: auditIco16AtualBranco,
+				deltaVsRodada4: auditSvgR4_16Branco
 					? {
-							pxProximosR: auditSvgR4_16Branco.pxProximosR - auditSvgR3_16Branco.pxProximosR,
-							pxProximosW: auditSvgR4_16Branco.pxProximosW - auditSvgR3_16Branco.pxProximosW,
-							pxProximosBranco: auditSvgR4_16Branco.pxProximosBranco - auditSvgR3_16Branco.pxProximosBranco,
+							pxProximosR: auditSvgAtual_16Branco.pxProximosR - auditSvgR4_16Branco.pxProximosR,
+							pxProximosW: auditSvgAtual_16Branco.pxProximosW - auditSvgR4_16Branco.pxProximosW,
+							pxProximosBranco: auditSvgAtual_16Branco.pxProximosBranco - auditSvgR4_16Branco.pxProximosBranco,
 						}
 					: null,
+				deltaVsRodada3: auditSvgR3_16Branco
+					? {
+							pxProximosR: auditSvgAtual_16Branco.pxProximosR - auditSvgR3_16Branco.pxProximosR,
+							pxProximosW: auditSvgAtual_16Branco.pxProximosW - auditSvgR3_16Branco.pxProximosW,
+							pxProximosBranco: auditSvgAtual_16Branco.pxProximosBranco - auditSvgR3_16Branco.pxProximosBranco,
+						}
+					: null,
+			};
+
+			// Medição da cor média do anel da borda sobre #FFFFFF e contraste contra #FFFFFF (meta >= 1,35:1)
+			const bordaSvg16 = await medirAnelBordaSobreBranco(chromiumFaviconRenders.svgAtual_16.branco, {
+				lado: 16,
+				anelPx: 1,
+				excluirTopoCentro: true,
+			});
+			const bordaIco16 = await medirAnelBordaSobreBranco(png16IcoAtual, {
+				lado: 16,
+				anelPx: 1,
+			});
+			const bordaIcon192 = await medirAnelBordaSobreBranco(path.join(PUBLIC_DIR, 'icon-192.png'), {
+				lado: 192,
+				anelPx: 1,
+			});
+			const bordaIcon512 = await medirAnelBordaSobreBranco(path.join(PUBLIC_DIR, 'icon-512.png'), {
+				lado: 512,
+				anelPx: 3,
+			});
+			const bordaPlacaContraste = {
+				ok: bordaSvg16.ok && bordaIco16.ok && bordaIcon192.ok && bordaIcon512.ok,
+				metaContraste: META_CONTRASTE_BORDA_BRANCO,
+				faviconSvg16Chromium: bordaSvg16,
+				faviconIco16: bordaIco16,
+				icon192: bordaIcon192,
+				icon512: bordaIcon512,
 			};
 
 			const alphaCanto = async (bufOrPath) => {
@@ -2116,6 +2266,7 @@ try {
 					semPrefersColorScheme &&
 					pixelAudit16.ok &&
 					pixelAuditSvg16Chromium.ok &&
+					bordaPlacaContraste.ok &&
 					cantosOk &&
 					manifestOk &&
 					headOk,
@@ -2125,6 +2276,7 @@ try {
 				semPrefersColorScheme,
 				pixelAudit16,
 				pixelAuditSvg16Chromium,
+				bordaPlacaContraste,
 				cantosOk,
 				cantos,
 				manifestOk,
