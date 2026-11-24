@@ -361,6 +361,7 @@ let alturaDinamicaResumo = null;
 let testesToqueResumo = null;
 let testesRotacaoResumo = null;
 let pousoMobileResumo = null;
+let pousoDprFracionarioResumo = null;
 let desempenhoCelularResumo = null;
 let reduzidoEFallbackCelularResumo = null;
 let regressaoT5Resumo = null;
@@ -998,6 +999,109 @@ try {
 			);
 		}
 
+		// Pouso (recorte 4× do header, diff <= 0,5%) e troca 2,59↔2,61 (diff <= 0,5%) em desktop com DPR fracionário e retina
+		{
+			const perfisDpr = [
+				{ id: '1280x800-dpr1.25', width: 1280, height: 800, dpr: 1.25 },
+				{ id: '1280x800-dpr1.5', width: 1280, height: 800, dpr: 1.5 },
+				{ id: '1280x800-dpr2', width: 1280, height: 800, dpr: 2 },
+				{ id: '1366x768-dpr1.25', width: 1366, height: 768, dpr: 1.25 },
+			];
+			const resultadosDpr = {};
+			for (const p of perfisDpr) {
+				const ctx = await browser.newContext({
+					viewport: { width: p.width, height: p.height },
+					deviceScaleFactor: p.dpr,
+				});
+				const page = await ctx.newPage();
+				anexarColetaConsole(page, `pouso-${p.id}`, consoleMensagens);
+
+				await page.goto(`${URL_BASE}/?debug=t4&t=2.59`, { waitUntil: 'networkidle' });
+				await page.waitForFunction(() => document.documentElement.dataset.capturaPronta === '1', undefined, { timeout: 15000 });
+				const p259 = path.join(outDir, `troca-2.59s-${p.id}.png`);
+				await page.screenshot({ path: p259 });
+
+				await page.goto(`${URL_BASE}/?debug=t4&t=2.61`, { waitUntil: 'networkidle' });
+				await page.waitForFunction(() => document.documentElement.dataset.capturaPronta === '1', undefined, { timeout: 15000 });
+				const p261 = path.join(outDir, `troca-2.61s-${p.id}.png`);
+				await page.screenshot({ path: p261 });
+
+				await page.goto(`${URL_BASE}/?debug=t4&t=3.1`, { waitUntil: 'networkidle' });
+				await page.waitForFunction(() => document.documentElement.dataset.capturaPronta === '1', undefined, { timeout: 15000 });
+				const alvoRect = await page.evaluate(() => {
+					const r = document.querySelector('[data-splash-alvo]').getBoundingClientRect();
+					return { left: r.left, top: r.top, width: r.width, height: r.height };
+				});
+				const p310 = path.join(outDir, `pouso-3.10s-${p.id}.png`);
+				await page.screenshot({ path: p310 });
+
+				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 12000 });
+				await page.waitForTimeout(150);
+				const pPos = path.join(outDir, `pos-splash-${p.id}.png`);
+				await page.screenshot({ path: pPos });
+				await ctx.close();
+
+				const diffTroca = await compararImagensPng(p259, p261, null);
+
+				const cropCss = 56;
+				const cropLeftPhys = Math.max(0, Math.round((alvoRect.left + alvoRect.width / 2 - cropCss / 2) * p.dpr));
+				const cropTopPhys = Math.max(0, Math.round((alvoRect.top + alvoRect.height / 2 - cropCss / 2) * p.dpr));
+				const cropSizePhys = Math.round(cropCss * p.dpr);
+
+				const raw310 = path.join(outDir, `header-${p.id}-3.10s-raw.png`);
+				const rawPos = path.join(outDir, `header-${p.id}-pos-raw.png`);
+				const zoom310 = path.join(outDir, `header-${p.id}-3.10s-4x.png`);
+				const zoomPos = path.join(outDir, `header-${p.id}-pos-splash-4x.png`);
+
+				await sharp(p310)
+					.extract({ left: cropLeftPhys, top: cropTopPhys, width: cropSizePhys, height: cropSizePhys })
+					.png()
+					.toFile(raw310);
+				await sharp(pPos)
+					.extract({ left: cropLeftPhys, top: cropTopPhys, width: cropSizePhys, height: cropSizePhys })
+					.png()
+					.toFile(rawPos);
+
+				await sharp(raw310).resize(cropCss * 4, cropCss * 4, { kernel: 'nearest' }).png().toFile(zoom310);
+				await sharp(rawPos).resize(cropCss * 4, cropCss * 4, { kernel: 'nearest' }).png().toFile(zoomPos);
+
+				const diffPouso = await compararImagensPng(raw310, rawPos, null);
+				fs.unlinkSync(raw310);
+				fs.unlinkSync(rawPos);
+				fs.unlinkSync(p259);
+				fs.unlinkSync(p261);
+				fs.unlinkSync(p310);
+				fs.unlinkSync(pPos);
+
+				const ok =
+					diffPouso.porcentagem <= META_DIFF_POUSO_MOBILE_PCT &&
+					diffTroca.porcentagem <= META_DIFF_TROCA_MOBILE_PCT;
+				resultadosDpr[p.id] = {
+					ok,
+					viewport: `${p.width}×${p.height}`,
+					dpr: p.dpr,
+					pousoVsHeader: {
+						metaPct: META_DIFF_POUSO_MOBILE_PCT,
+						imagem310_4x: path.relative(ROOT_DIR, zoom310).replace(/\\/g, '/'),
+						imagemPos_4x: path.relative(ROOT_DIR, zoomPos).replace(/\\/g, '/'),
+						...diffPouso,
+					},
+					troca259Vs261: {
+						metaPct: META_DIFF_TROCA_MOBILE_PCT,
+						...diffTroca,
+					},
+				};
+				console.log(
+					`  desktop ${p.id}: pouso↔header=${diffPouso.porcentagem}% (meta <= ${META_DIFF_POUSO_MOBILE_PCT}%) · troca 2.59↔2.61=${diffTroca.porcentagem}% (${ok ? 'OK' : 'FALHOU'})`,
+				);
+			}
+			pousoDprFracionarioResumo = {
+				ok: Object.values(resultadosDpr).every((r) => r.ok),
+				perfis: resultadosDpr,
+			};
+		}
+
 		// === 8. Desempenho em 1×, 4× e 6× (390×844 dpr 3) + movimento reduzido e fallback no celular ===
 		console.log(`[T6 rodada ${rodada}] 8/9 Medindo desempenho em 1×, 4× e 6× (390×844 dpr 3) e fluxos reduzido/fallback mobile...`);
 		{
@@ -1373,6 +1477,7 @@ const metricas = {
 	testesToque: testesToqueResumo,
 	testesRotacao: testesRotacaoResumo,
 	pousoMobile390x844: pousoMobileResumo,
+	pousoDesktopDprFracionario: pousoDprFracionarioResumo,
 	desempenhoCelular: desempenhoCelularResumo,
 	reduzidoEFallbackCelular: reduzidoEFallbackCelularResumo,
 	regressaoT5: regressaoT5Resumo,
@@ -1404,6 +1509,7 @@ const tudoOk =
 	testesToqueResumo?.ok === true &&
 	testesRotacaoResumo?.ok === true &&
 	pousoMobileResumo?.ok === true &&
+	pousoDprFracionarioResumo?.ok === true &&
 	desempenhoCelularResumo?.ok === true &&
 	reduzidoEFallbackCelularResumo?.ok === true &&
 	regressaoT5Resumo?.ok === true &&

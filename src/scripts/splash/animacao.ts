@@ -546,9 +546,14 @@ export function criarAnimacaoControlavel(
 		// real (evita snap de 0,5 px do layout em larguras ímpares como 1265 px / 375 px).
 		// Em telas de celular (menor dimensão <= 500 CSS px), limita o WebGL a dpr 2
 		// (reduz em ~56% os pixels rasterizados em aparelhos dpr 3 mantendo o SVG vetorial nítido).
+		const dprReal = dprFixo ?? (window.devicePixelRatio || 1);
 		const tetoDpr = Math.min(w, h) <= 500 ? 2 : 3;
-		const ratio = Math.min(dprFixo ?? (window.devicePixelRatio || 1), tetoDpr);
-		const snapDevicePx = (v: number): number => Math.round(v);
+		const ratio = Math.min(dprReal, tetoDpr);
+		// O Blink pinta elementos de layout (`[data-splash-alvo]` em flex/center) fazendo snap em
+		// CSS pixels inteiros (`PixelSnappedIntRect`: ex. 144,5 → 145 e 11,5 → 12 em qualquer DPR).
+		// Usar `Math.round(v * dprReal) / dprReal` desloca o pouso em 0,5 CSS px (7–12% diff em
+		// dpr 1,25/1,5/2 e 1,66% em dpr 3); `Math.round(v)` casa pixel a pixel em todos os DPRs.
+		const snapLayoutCssPx = (v: number): number => Math.round(v);
 
 		const svgLeft = (w - lado) / 2;
 		const svgTop = (h - lado) / 2;
@@ -573,10 +578,10 @@ export function criarAnimacaoControlavel(
 		const overlayRect = container.getBoundingClientRect();
 		const alvoRect = alvo().rect;
 		if (alvoRect.width > 0 && alvoRect.height > 0) {
-			const alvoLeft = snapDevicePx(alvoRect.left - overlayRect.left);
-			const alvoTop = snapDevicePx(alvoRect.top - overlayRect.top);
-			const alvoWidth = snapDevicePx(alvoRect.width);
-			const alvoHeight = snapDevicePx(alvoRect.height);
+			const alvoLeft = snapLayoutCssPx(alvoRect.left - overlayRect.left);
+			const alvoTop = snapLayoutCssPx(alvoRect.top - overlayRect.top);
+			const alvoWidth = snapLayoutCssPx(alvoRect.width);
+			const alvoHeight = snapLayoutCssPx(alvoRect.height);
 			const alvoCx = alvoLeft + alvoWidth / 2;
 			const alvoCy = alvoTop + alvoHeight / 2;
 			const alvoLado = Math.min(alvoWidth, alvoHeight);

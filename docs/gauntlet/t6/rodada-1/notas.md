@@ -19,10 +19,18 @@ Antes de editar qualquer arquivo em `src/`, medimos o comportamento da splash da
    - **Baseline**: `onPointerDown` em `controlador.ts` não chamava `preventDefault()`/`stopPropagation()` nem suprimia o evento `click` sintetizado após `touchend`.
    - **Correção**: `onPointerDown` previne o comportamento padrão e arma um filtro temporário em captura de `click` (até 500 ms ou até o próximo `pointerdown` após `finalizar()`), além de ouvir `orientationchange` e `visualViewport.resize`.
    - **Resultado**: pular em `323 ms`, `0` cliques fantasma sobre o link do header por baixo, toque deliberado seguinte funciona normalmente, toque duplo idempotente (`321 ms`, 0 erros).
-4. **Pouso no header em `390×844 dpr 3`**:
-   - **Baseline**: `snapDevicePx` arredondava `alvoRect.top = 11,5 px` para `35/3 = 11,67 px` enquanto o Blink faz layout snap de `11,5 px` para `12 px` (`36 px` físicos em dpr 3), gerando `1,6546%` de diff no recorte 4× do header.
-   - **Correção**: `snapDevicePx = (v) => Math.round(v)` (alinhado ao snap em CSS px do Blink, idêntico ao desktop `dpr 1`) + `lado` inteiro em CSS px.
-   - **Resultado**: diff no recorte 4× do header em `390×844 dpr 3` caiu de `1,6546%` para **`0,0035%`** (`1 / 28.224 px`, meta ≤ `0,5%`); troca `2,59 ↔ 2,61 s` no mobile = **`0,0004%`** (`11 / 2.962.440 px`).
+4. **Pouso no header em `390×844 dpr 3` e em desktop com DPR fracionário/retina (`1,25`, `1,5`, `2`)**:
+   - **Experimento comparativo (snap pelo `dprReal` vs. snap em CSS px)**: separamos `dprReal = dprFixo ?? (window.devicePixelRatio || 1)` do `ratio` do WebGL (limitado a `2` em `<= 500 px`) e medimos o pouso (recorte 4× do header) nos dois modos:
+
+| Perfil | Snap em device px (`Math.round(v * dprReal) / dprReal`) | Snap em CSS px (`Math.round(v)`) | Troca `2,59↔2,61` |
+|---|---|---|---|
+| `390×844` dpr 3 | `1,6617%` ❌ | **`0,0035%`** (`1 px`) ✅ | **`0,0004%`** ✅ |
+| `1280×800` dpr 1,25 | `10,1429%` ❌ | **`0,0000%`** (`0 px`) ✅ | **`0,0000%`** ✅ |
+| `1280×800` dpr 1,5 | `8,7160%` ❌ | **`0,0000%`** (`0 px`) ✅ | **`0,0000%`** ✅ |
+| `1280×800` dpr 2 | `7,6212%` ❌ | **`0,0080%`** ✅ | **`0,0000%`** ✅ |
+| `1366×768` dpr 1,25 | `12,2857%` ❌ | **`0,0204%`** ✅ | **`0,0000%`** ✅ |
+
+   - **Por que `Math.round(v * dprReal) / dprReal` falha em DPR > 1 e `Math.round(v)` acerta em todos os DPRs**: o Blink pinta elementos de layout (`[data-splash-alvo]` centralizado em `h-16 border-b` → `top = 11,5 px`, e `max-w-5xl` em `1265/1351 px` por `scrollbar-gutter: stable` → `left = 144,5 / 187,5 px`) aplicando *pixel snapping* de layout em **CSS pixels inteiros** (`PixelSnappedIntRect`: `11,5 → 12`, `144,5 → 145`, `187,5 → 188`) antes da escala de DPR. Fazer snap em *device pixels* pelo `dprReal` desloca o pouso em até `0,5 CSS px` (`7,6%–12,3%` de diff em `dpr 1,25/1,5/2` e `1,66%` em `dpr 3`). Mantivemos `dprReal` separado de `ratio` do WebGL e adotamos `snapLayoutCssPx = (v) => Math.round(v)` + `lado` inteiro em CSS px, atingindo **`0,0000%–0,0204%`** em todos os perfis.
 5. **Desempenho sob CPU 4× em `390×844 dpr 3`**:
    - **Antes da otimização (`dpr 3` no WebGL)**: em CPU 4×, `pronto = 620,4 ms`, `rAF med = 14,23 ms`, `p95 = 39,6 ms` (> 33 ms), `max = 95,0 ms`, `18/203` quadros > 33 ms.
    - **Otimização aplicada só no celular**: em `animacao.ts`, quando `Math.min(w, h) <= 500`, limita `renderer.setPixelRatio` a no máximo `2` (reduzindo ~55,6% dos pixels rasterizados no canvas em aparelhos `dpr 3`, enquanto `<svg data-splash-linhas>` e `[data-splash-svg-final]` continuam vetoriais na resolução nativa). Não foi necessário alterar o shader de sombra (AA 8× intacto).
@@ -50,11 +58,11 @@ Antes de editar qualquer arquivo em `src/`, medimos o comportamento da splash da
 
 ## 3. Tabela de Desempenho (`390×844 dpr 3`, `0–3,1 s`)
 
-| Throttling CPU | 3D pronto (ms) | Fallback | rAF média (ms) | rAF p95 (ms) | rAF máx (ms) | Quadros > 33 ms | Trabalho med / p95 (ms) | HLR med / p95 (ms) |
-|---|---|---|---|---|---|---|---|---|
-| **1×** | `136,6 ms` | Não | `8,59` | `9,30` | `71,30` | `2 / 389` | `1,31 / 3,50` | `1,05 / 2,90` |
-| **4×** (celular médio) | `474,3 ms` | Não | `10,36` | `20,40` | `47,30` | `3 / 296` | `4,18 / 15,00` | `3,40 / 13,00` |
-| **6×** (celular fraco) | *(>800 ms / fallback)* | *(timeout 800 ms)* | `14,37` | `36,20` | `84,20` | `15 / 237` | `6,13 / 24,30` | `5,29 / 19,90` |
+| Throttling CPU | 3D pronto (ms) | Fallback | rAF média (ms) | rAF p95 (ms) | rAF máx (ms) | Quadros > 33 ms |
+|---|---|---|---|---|---|---|
+| **1×** | `241,2 ms` | Não | `8,50` | `9,90` | `58,10` | `1 / 394` |
+| **4×** (celular médio) | `645,6 ms` | Não | `12,55` | `30,80` | `124,80` | `11 / 233` |
+| **6×** (celular fraco) | *(>800 ms / fallback)* | *(timeout 800 ms)* | `19,62` | `59,10` | `114,90` | `16 / 174` |
 
 ## 4. Evidências Geradas
 - Folha de contato (6 tamanhos × 8 tempos): `docs/gauntlet/t6/rodada-1/folha-contato.png`

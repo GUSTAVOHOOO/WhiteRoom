@@ -1,17 +1,17 @@
 {
   "rodada": 1,
-  "timestamp": "2026-11-24T13:50:03.521Z",
+  "timestamp": "2026-11-24T14:03:00.450Z",
   "porta": 4403,
   "erroGate": null,
   "astroCheck": {
     "ok": true,
     "exitCode": 0,
-    "duracaoMs": 13384
+    "duracaoMs": 17281
   },
   "astroBuild": {
     "ok": true,
     "exitCode": 0,
-    "duracaoMs": 6074
+    "duracaoMs": 9314
   },
   "geradorLogoSvgCheck": {
     "ok": true,
@@ -356,7 +356,7 @@
   "testesToque": {
     "ok": true,
     "pularToque": {
-      "tempoPularMs": 323,
+      "tempoPularMs": 328,
       "cliquesFantasma": [],
       "cliquesPosDeliberado": 1
     },
@@ -365,7 +365,7 @@
       "scale": 1
     },
     "toqueDuplo": {
-      "tempoDuploMs": 321,
+      "tempoDuploMs": 314,
       "alvoVisivel": true
     }
   },
@@ -421,62 +421,167 @@
       "diffImagem": "docs/gauntlet/t6/rodada-1/troca-diff-mobile.png"
     }
   },
+  "pousoDesktopDprFracionario": {
+    "ok": true,
+    "perfis": {
+      "1280x800-dpr1.25": {
+        "ok": true,
+        "viewport": "1280×800",
+        "dpr": 1.25,
+        "pousoVsHeader": {
+          "metaPct": 0.5,
+          "imagem310_4x": "docs/gauntlet/t6/rodada-1/header-1280x800-dpr1.25-3.10s-4x.png",
+          "imagemPos_4x": "docs/gauntlet/t6/rodada-1/header-1280x800-dpr1.25-pos-splash-4x.png",
+          "largura": 70,
+          "altura": 70,
+          "totalPixels": 4900,
+          "pixelsDiferentes": 0,
+          "porcentagem": 0,
+          "diffImagem": null
+        },
+        "troca259Vs261": {
+          "metaPct": 0.5,
+          "largura": 1600,
+          "altura": 1000,
+          "totalPixels": 1600000,
+          "pixelsDiferentes": 0,
+          "porcentagem": 0,
+          "diffImagem": null
+        }
+      },
+      "1280x800-dpr1.5": {
+        "ok": true,
+        "viewport": "1280×800",
+        "dpr": 1.5,
+        "pousoVsHeader": {
+          "metaPct": 0.5,
+          "imagem310_4x": "docs/gauntlet/t6/rodada-1/header-1280x800-dpr1.5-3.10s-4x.png",
+          "imagemPos_4x": "docs/gauntlet/t6/rodada-1/header-1280x800-dpr1.5-pos-splash-4x.png",
+          "largura": 84,
+          "altura": 84,
+          "totalPixels": 7056,
+          "pixelsDiferentes": 0,
+          "porcentagem": 0,
+          "diffImagem": null
+        },
+        "troca259Vs261": {
+          "metaPct": 0.5,
+          "largura": 1920,
+          "altura": 1200,
+          "totalPixels": 2304000,
+          "pixelsDiferentes": 0,
+          "porcentagem": 0,
+          "diffImagem": null
+        }
+      },
+      "1280x800-dpr2": {
+        "ok": true,
+        "viewport": "1280×800",
+        "dpr": 2,
+        "pousoVsHeader": {
+          "metaPct": 0.5,
+          "imagem310_4x": "docs/gauntlet/t6/rodada-1/header-1280x800-dpr2-3.10s-4x.png",
+          "imagemPos_4x": "docs/gauntlet/t6/rodada-1/header-1280x800-dpr2-pos-splash-4x.png",
+          "largura": 112,
+          "altura": 112,
+          "totalPixels": 12544,
+          "pixelsDiferentes": 1,
+          "porcentagem": 0.008,
+          "diffImagem": null
+        },
+        "troca259Vs261": {
+          "metaPct": 0.5,
+          "largura": 2560,
+          "altura": 1600,
+          "totalPixels": 4096000,
+          "pixelsDiferentes": 0,
+          "porcentagem": 0,
+          "diffImagem": null
+        }
+      },
+      "1366x768-dpr1.25": {
+        "ok": true,
+        "viewport": "1366×768",
+        "dpr": 1.25,
+        "pousoVsHeader": {
+          "metaPct": 0.5,
+          "imagem310_4x": "docs/gauntlet/t6/rodada-1/header-1366x768-dpr1.25-3.10s-4x.png",
+          "imagemPos_4x": "docs/gauntlet/t6/rodada-1/header-1366x768-dpr1.25-pos-splash-4x.png",
+          "largura": 70,
+          "altura": 70,
+          "totalPixels": 4900,
+          "pixelsDiferentes": 1,
+          "porcentagem": 0.0204,
+          "diffImagem": null
+        },
+        "troca259Vs261": {
+          "metaPct": 0.5,
+          "largura": 1708,
+          "altura": 960,
+          "totalPixels": 1639680,
+          "pixelsDiferentes": 0,
+          "porcentagem": 0,
+          "diffImagem": null
+        }
+      }
+    }
+  },
   "desempenhoCelular": {
     "metaPronto4xMs": 800,
     "metaP95_4xMs": 33,
     "ok": true,
     "cpu1x": {
       "rate": 1,
-      "prontoMs": 136.6,
+      "prontoMs": 241.2,
       "fallbackDisparou": false,
-      "quadros": 389,
-      "mediaMs": 8.585,
-      "p95Ms": 9.3,
-      "maxMs": 71.3,
-      "quadrosAcima33Ms": 2,
-      "trabalhoMediaMs": 1.313,
-      "trabalhoP95Ms": 3.5,
-      "hlrMediaMs": 1.053,
-      "hlrP95Ms": 2.9
+      "quadros": 394,
+      "mediaMs": 8.496,
+      "p95Ms": 9.9,
+      "maxMs": 58.1,
+      "quadrosAcima33Ms": 1,
+      "trabalhoMediaMs": 1.887,
+      "trabalhoP95Ms": 5.7,
+      "hlrMediaMs": 1.58,
+      "hlrP95Ms": 4.9
     },
     "cpu4x": {
       "rate": 4,
-      "prontoMs": 474.3,
+      "prontoMs": 645.6,
       "fallbackDisparou": false,
-      "quadros": 296,
-      "mediaMs": 10.364,
-      "p95Ms": 20.4,
-      "maxMs": 47.3,
-      "quadrosAcima33Ms": 3,
-      "trabalhoMediaMs": 4.184,
-      "trabalhoP95Ms": 15,
-      "hlrMediaMs": 3.403,
-      "hlrP95Ms": 13
+      "quadros": 233,
+      "mediaMs": 12.551,
+      "p95Ms": 30.8,
+      "maxMs": 124.8,
+      "quadrosAcima33Ms": 11,
+      "trabalhoMediaMs": 5.518,
+      "trabalhoP95Ms": 19.7,
+      "hlrMediaMs": 4.852,
+      "hlrP95Ms": 19.5
     },
     "cpu6x": {
       "rate": 6,
       "prontoMs": null,
       "fallbackDisparou": false,
-      "quadros": 237,
-      "mediaMs": 14.373,
-      "p95Ms": 36.2,
-      "maxMs": 84.2,
-      "quadrosAcima33Ms": 15,
-      "trabalhoMediaMs": 6.134,
-      "trabalhoP95Ms": 24.3,
-      "hlrMediaMs": 5.285,
-      "hlrP95Ms": 19.9
+      "quadros": 174,
+      "mediaMs": 19.616,
+      "p95Ms": 59.1,
+      "maxMs": 114.9,
+      "quadrosAcima33Ms": 16,
+      "trabalhoMediaMs": 8.513,
+      "trabalhoP95Ms": 45.6,
+      "hlrMediaMs": 7.842,
+      "hlrP95Ms": 38.7
     }
   },
   "reduzidoEFallbackCelular": {
     "ok": true,
     "movimentoReduzido": {
       "iniciouReduzida": true,
-      "duracaoMs": 962,
+      "duracaoMs": 985,
       "alvoVisivel": true
     },
     "fallback": {
-      "duracaoMs": 567,
+      "duracaoMs": 558,
       "alvoVisivel": true
     }
   },
