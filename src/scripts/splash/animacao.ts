@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import * as THREE from 'three';
-import { atualizarEnquadramentoCamera } from './cena/camera';
+import { atualizarEnquadramentoCamera, calcularEscalaEnquadramento } from './cena/camera';
 import { COSSENO_ELEVACAO, FRUSTUM_CUBO } from './cena/constantes';
 import { criarCena } from './cena/cubo';
 import { POSICOES_FINAIS } from './cena/pecas';
@@ -53,6 +53,7 @@ interface EstadoCoreografia {
 interface MetricasLayout {
 	largura: number;
 	altura: number;
+	escalaEnquadramento: number;
 	pixelsPorUnidade: number;
 	wInicio: THREE.Vector3;
 	rInicio: THREE.Vector3;
@@ -86,6 +87,7 @@ export interface TelemetriaPosePecas {
 		malhaCorpoVisivel: boolean;
 		malhaLaminaVisivel: boolean;
 	};
+	quarto: TelemetriaPecaPose;
 }
 
 export interface TelemetriaQuadroSplash {
@@ -234,6 +236,7 @@ export function criarAnimacaoControlavel(
 	const layout: MetricasLayout = {
 		largura: 1,
 		altura: 1,
+		escalaEnquadramento: 1,
 		pixelsPorUnidade: 1,
 		wInicio: new THREE.Vector3(),
 		rInicio: new THREE.Vector3(),
@@ -464,7 +467,7 @@ export function criarAnimacaoControlavel(
 			progressoPonteW: estado.wPosT,
 			pulsoConstrucao: estado.pulsoLinhas,
 			matrizConstrucao,
-			escalaCubo: 1,
+			escalaCubo: layout.escalaEnquadramento,
 		});
 	};
 
@@ -501,36 +504,49 @@ export function criarAnimacaoControlavel(
 		}
 	};
 
-	const recalcularLayout = (): void => {
+	const recalcularLayout = (renderizar = true): void => {
 		if (destruida) return;
 
 		// Dimensiona canvas, HLR e SVG final pelo tamanho real do container (nunca por window.innerWidth)
 		const w = Math.max(1, container.clientWidth || window.innerWidth);
 		const h = Math.max(1, container.clientHeight || window.innerHeight);
-		const lado = Math.min(w, h);
+		const escalaEnquadramento = calcularEscalaEnquadramento(w, h);
+		const lado = Math.round(Math.min(w, h) * escalaEnquadramento);
 		const pixelsPorUnidade = lado / FRUSTUM_CUBO;
 		const meiaLargura = (FRUSTUM_CUBO / 2) * (w / lado);
 		const meiaAltura = (FRUSTUM_CUBO / 2) * (h / lado);
 
 		layout.largura = w;
 		layout.altura = h;
+		layout.escalaEnquadramento = escalaEnquadramento;
 		layout.pixelsPorUnidade = pixelsPorUnidade;
 
-		// Posições iniciais fora da viewport (retrato e paisagem)
+		// Posições iniciais fora da viewport (retrato e paisagem).
+		// Mantém a mesma inclinação diagonal do desktop (razão V/H <= 0,84, ~40°) também
+		// em retrato alto, evitando que o R suba quase na vertical por baixo do W e mantendo
+		// `rInicio.z` fortemente negativo (atrás da face frontal preta do W) sem precisar
+		// aproximar o plano de entrada da face do W.
+		const deslocHBase = meiaLargura * 0.85 + 1.15;
+		const deslocVBase = meiaAltura + 1.15;
+		const razaoVhMax = 0.84;
+		const deslocVMin = meiaAltura * 0.78;
+		const deslocV = Math.min(deslocVBase, Math.max(deslocVMin, Math.min(deslocVBase, deslocHBase * razaoVhMax)));
+		const deslocH = Math.max(deslocHBase, deslocV / razaoVhMax);
+
 		layout.wInicio
 			.set(0, 0, 0)
-			.addScaledVector(camRight, -(meiaLargura * 0.85 + 1.15))
-			.addScaledVector(camUp, -(meiaAltura + 1.15));
+			.addScaledVector(camRight, -deslocH)
+			.addScaledVector(camUp, -deslocV);
 
 		layout.rInicio
 			.set(0, 0, 0)
-			.addScaledVector(camRight, meiaLargura * 0.85 + 1.15)
-			.addScaledVector(camUp, -(meiaAltura + 1.15));
+			.addScaledVector(camRight, deslocH)
+			.addScaledVector(camUp, -deslocV);
 
-		// Em viewports retrato muito altos, compensa ao longo de -camBack (invisível na projeção ortográfica)
-		// para garantir rInicio.z <= -0,25 (sempre atrás da face frontal preta do W em Z = +0,5).
-		if (layout.rInicio.z > -0.25) {
-			const passoBack = (layout.rInicio.z + 0.25) / camBack.z;
+		// Guarda defensiva para proporções retrato ainda mais extremas: mantém rInicio.z <= -0,5
+		// ao longo de -camBack (invisível na projeção ortográfica).
+		if (layout.rInicio.z > -0.5) {
+			const passoBack = (layout.rInicio.z + 0.5) / camBack.z;
 			layout.rInicio.addScaledVector(camBack, -passoBack);
 		}
 
@@ -540,8 +556,16 @@ export function criarAnimacaoControlavel(
 		// Enquadramento exato 1:1 da logo SVG final sobre o quadrado 1024×1024 da câmera ortográfica.
 		// Mantém left/top em 0 e aplica o deslocamento inicial no `transform` para precisão subpixel
 		// real (evita snap de 0,5 px do layout em larguras ímpares como 1265 px / 375 px).
-		const ratio = Math.min(dprFixo ?? (window.devicePixelRatio || 1), 3);
-		const snapDevicePx = (v: number): number => Math.round(v * ratio) / ratio;
+		// Em telas de celular (menor dimensão <= 500 CSS px), limita o WebGL a dpr 2
+		// (reduz em ~56% os pixels rasterizados em aparelhos dpr 3 mantendo o SVG vetorial nítido).
+		const dprReal = dprFixo ?? (window.devicePixelRatio || 1);
+		const tetoDpr = Math.min(w, h) <= 500 ? 2 : 3;
+		const ratio = Math.min(dprReal, tetoDpr);
+		// O Blink pinta elementos de layout (`[data-splash-alvo]` em flex/center) fazendo snap em
+		// CSS pixels inteiros (`PixelSnappedIntRect`: ex. 144,5 → 145 e 11,5 → 12 em qualquer DPR).
+		// Usar `Math.round(v * dprReal) / dprReal` desloca o pouso em 0,5 CSS px (7–12% diff em
+		// dpr 1,25/1,5/2 e 1,66% em dpr 3); `Math.round(v)` casa pixel a pixel em todos os DPRs.
+		const snapLayoutCssPx = (v: number): number => Math.round(v);
 
 		const svgLeft = (w - lado) / 2;
 		const svgTop = (h - lado) / 2;
@@ -566,10 +590,10 @@ export function criarAnimacaoControlavel(
 		const overlayRect = container.getBoundingClientRect();
 		const alvoRect = alvo().rect;
 		if (alvoRect.width > 0 && alvoRect.height > 0) {
-			const alvoLeft = snapDevicePx(alvoRect.left - overlayRect.left);
-			const alvoTop = snapDevicePx(alvoRect.top - overlayRect.top);
-			const alvoWidth = snapDevicePx(alvoRect.width);
-			const alvoHeight = snapDevicePx(alvoRect.height);
+			const alvoLeft = snapLayoutCssPx(alvoRect.left - overlayRect.left);
+			const alvoTop = snapLayoutCssPx(alvoRect.top - overlayRect.top);
+			const alvoWidth = snapLayoutCssPx(alvoRect.width);
+			const alvoHeight = snapLayoutCssPx(alvoRect.height);
 			const alvoCx = alvoLeft + alvoWidth / 2;
 			const alvoCy = alvoTop + alvoHeight / 2;
 			const alvoLado = Math.min(alvoWidth, alvoHeight);
@@ -587,9 +611,11 @@ export function criarAnimacaoControlavel(
 		// Atualiza renderer, câmera e dimensões SVG e renderiza na pose atual
 		renderer.setPixelRatio(ratio);
 		renderer.setSize(w, h, false);
-		atualizarEnquadramentoCamera(camera, w, h);
+		atualizarEnquadramentoCamera(camera, w, h, escalaEnquadramento);
 		linhas.definirDimensoes(w, h);
-		renderizarQuadro(false);
+		if (renderizar) {
+			renderizarQuadro(false);
+		}
 	};
 
 	// --- Timeline GSAP determinística (0..2,60 s intactos; 2,60..3,10 s voo SVG + fades) ---
@@ -621,37 +647,45 @@ export function criarAnimacaoControlavel(
 		0,
 	);
 
-	// 0,30 - 0,70 s: W entra do canto inferior esquerdo com desaceleração forte e para seco na pose final
+	// 0,35 - 0,70 s: W acelera do canto inferior esquerdo (`power2.in` = t³) e trava seco na pose final em 0,70 s
 	timeline.to(
 		estado,
 		{
 			wPosT: 1,
-			duration: 0.4,
-			ease: 'expo.out',
+			duration: 0.35,
+			ease: 'power2.in',
 		},
-		0.3,
+		0.35,
 	);
-	timeline.to(estado, { shakeCenaX: 1.6, shakeCenaY: 1.0, duration: 0.02, ease: 'none' }, 0.7);
-	timeline.to(estado, { shakeCenaX: -0.9, shakeCenaY: -0.6, duration: 0.025, ease: 'none' }, 0.72);
-	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 0.745);
-	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 0.7);
-	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 0.725);
+	// Tremor rígido da cena inteira (peças + linhas juntas, 2,44 px, 4 ciclos amortecidos em 125 ms,
+	// impulso inicial para cima-direita coerente com a entrada do W) + pulso nas linhas (1,027)
+	timeline.to(estado, { shakeCenaX: 2.0, shakeCenaY: 1.4, duration: 0.025, ease: 'none' }, 0.7);
+	timeline.to(estado, { shakeCenaX: -1.45, shakeCenaY: -1.0, duration: 0.025, ease: 'none' }, 0.725);
+	timeline.to(estado, { shakeCenaX: 0.85, shakeCenaY: 0.6, duration: 0.025, ease: 'none' }, 0.75);
+	timeline.to(estado, { shakeCenaX: -0.4, shakeCenaY: -0.28, duration: 0.025, ease: 'none' }, 0.775);
+	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 0.8);
+	timeline.to(estado, { pulsoLinhas: 1.027, duration: 0.025, ease: 'power2.out' }, 0.7);
+	timeline.to(estado, { pulsoLinhas: 1, duration: 0.11, ease: 'power2.out' }, 0.725);
 
-	// 0,85 - 1,22 s: R entra do canto inferior direito com desaceleração forte e para seco encaixado no W
+	// 0,90 - 1,25 s: R acelera do canto inferior direito (`power2.in` = t³) e trava seco encaixado no W em 1,25 s
 	timeline.to(
 		estado,
 		{
 			rPosT: 1,
-			duration: 0.37,
-			ease: 'expo.out',
+			duration: 0.35,
+			ease: 'power2.in',
 		},
-		0.85,
+		0.9,
 	);
-	timeline.to(estado, { shakeCenaX: -1.6, shakeCenaY: 1.0, duration: 0.02, ease: 'none' }, 1.22);
-	timeline.to(estado, { shakeCenaX: 0.9, shakeCenaY: -0.6, duration: 0.025, ease: 'none' }, 1.24);
-	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 1.265);
-	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 1.22);
-	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 1.245);
+	// Tremor rígido da cena inteira (W + R + linhas juntos, 2,44 px, 4 ciclos amortecidos em 125 ms,
+	// impulso inicial para cima-esquerda coerente com a entrada do R) + pulso nas linhas (1,027)
+	timeline.to(estado, { shakeCenaX: -2.0, shakeCenaY: 1.4, duration: 0.025, ease: 'none' }, 1.25);
+	timeline.to(estado, { shakeCenaX: 1.45, shakeCenaY: -1.0, duration: 0.025, ease: 'none' }, 1.275);
+	timeline.to(estado, { shakeCenaX: -0.85, shakeCenaY: 0.6, duration: 0.025, ease: 'none' }, 1.3);
+	timeline.to(estado, { shakeCenaX: 0.4, shakeCenaY: -0.28, duration: 0.025, ease: 'none' }, 1.325);
+	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 1.35);
+	timeline.to(estado, { pulsoLinhas: 1.027, duration: 0.025, ease: 'power2.out' }, 1.25);
+	timeline.to(estado, { pulsoLinhas: 1, duration: 0.11, ease: 'power2.out' }, 1.275);
 
 	// 1,60 - 1,90 s: quarto branco cai reto de cima como peso e gera impacto com achatamento ~7%
 	timeline.to(
@@ -759,10 +793,30 @@ export function criarAnimacaoControlavel(
 		typeof ResizeObserver !== 'undefined' ? new ResizeObserver(agendarResize) : null;
 	resizeObserver?.observe(container);
 	window.addEventListener('resize', agendarResize);
+	window.addEventListener('orientationchange', agendarResize);
+	window.visualViewport?.addEventListener('resize', agendarResize);
 
-	// Inicializa no quadro t = 0
+	// Aquece o pipeline WebGL (compila shaders de todas as peças + shadow map em uma única
+	// passagem) enquanto o canvas ainda está oculto (`opacity: 0`), evitando travadas no 1º impacto.
+	const aquecerShaders = (): void => {
+		pecas.w.visible = true;
+		pecas.r.visible = true;
+		pecas.quarto.visible = true;
+		if (meshRSolido) meshRSolido.visible = true;
+		if (meshRCorpo) meshRCorpo.visible = true;
+		if (meshRLamina) meshRLamina.visible = true;
+		raizCubo.position.set(0, 0, 0);
+		raizCubo.scale.set(1, 1, 1);
+		raizCubo.updateMatrixWorld(true);
+		atualizarSombra(0, 0);
+		renderer.render(scene, camera);
+	};
+
+	// Inicializa dimensões sem renderizar t=0 redundante, aquece shaders e restaura t=0 limpo
 	timeline.pause(0);
-	recalcularLayout();
+	recalcularLayout(false);
+	aquecerShaders();
+	renderizarQuadro(false);
 
 	const seek = (tempoSeg: number): void => {
 		if (destruida) return;
@@ -1013,6 +1067,7 @@ export function criarAnimacaoControlavel(
 					malhaCorpoVisivel: Boolean(meshRCorpo?.visible),
 					malhaLaminaVisivel: Boolean(meshRLamina?.visible),
 				},
+				quarto: lerPeca(pecas.quarto),
 			};
 		},
 
@@ -1021,6 +1076,8 @@ export function criarAnimacaoControlavel(
 			destruida = true;
 			window.cancelAnimationFrame(resizeRaf);
 			window.removeEventListener('resize', agendarResize);
+			window.removeEventListener('orientationchange', agendarResize);
+			window.visualViewport?.removeEventListener('resize', agendarResize);
 			resizeObserver?.disconnect();
 			tlPular?.kill();
 			tlPular = null;

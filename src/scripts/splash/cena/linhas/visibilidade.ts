@@ -30,6 +30,7 @@ export function objetoVisivelNaCena(obj: THREE.Object3D): boolean {
 
 interface TrianguloProjetado {
 	malhaId: number;
+	ehRSolido: boolean;
 	mascara?: TipoMascaraHlr;
 	papelConstrucao: number;
 	x0: number;
@@ -64,6 +65,7 @@ interface TrianguloProjetado {
 
 interface ArestaProjetada {
 	malhaId: number; // -1 para construção
+	ehRSolido: boolean;
 	mascara?: TipoMascaraHlr;
 	ehConstrucao: boolean;
 	ehPonteW: boolean;
@@ -128,10 +130,13 @@ export class MotorVisibilidadeHlr {
 		estado?: EstadoAnimacaoHlr,
 	): ResultadoVisibilidade {
 		const escalaCubo = Math.max(0.01, estado?.escalaCubo ?? 1);
+		// Em retrato (`escalaCubo > 1`), o cubo continua 1×1×1 em coordenadas de mundo e
+		// o frustum near..far não muda: só tolerâncias 2D escalam acima de 1, nunca as 3D/NDC.
+		const escalaMundo = Math.min(1, escalaCubo);
 		const escalaCubo2 = escalaCubo * escalaCubo;
-		const epsOclusaoNdc = EPS_OCLUSAO_NDC * escalaCubo;
-		const passoEmendaMundo = PASSO_EMENDA_MUNDO * escalaCubo;
-		const epsPlanoEmendaNdc = EPS_PLANO_EMENDA_NDC * escalaCubo;
+		const epsOclusaoNdc = EPS_OCLUSAO_NDC * escalaMundo;
+		const passoEmendaMundo = PASSO_EMENDA_MUNDO * escalaMundo;
+		const epsPlanoEmendaNdc = EPS_PLANO_EMENDA_NDC * escalaMundo;
 		const minComp2dPx = MIN_COMP_2D_PX * escalaCubo;
 		const tolColinearCortePx = TOL_COLINEAR_CORTE_PX * escalaCubo;
 		const margemBboxTriPx = 0.1 * escalaCubo;
@@ -175,6 +180,7 @@ export class MotorVisibilidadeHlr {
 			this.mvp.multiplyMatrices(this.viewProj, mw);
 			const e = this.mvp.elements;
 			this.normalMat.getNormalMatrix(mw);
+			const ehRSolido = dados.malha.name === 'malha-r-solido';
 
 			const verts = dados.vertsLocal;
 			const numVerts = verts.length / 3;
@@ -229,6 +235,7 @@ export class MotorVisibilidadeHlr {
 
 				tris.push({
 					malhaId: dados.id,
+					ehRSolido,
 					mascara: dados.mascara,
 					papelConstrucao: papeisConstrucao[t],
 					x0,
@@ -272,6 +279,7 @@ export class MotorVisibilidadeHlr {
 			this.mvp.multiplyMatrices(this.viewProj, mw);
 			const e = this.mvp.elements;
 			this.normalMat.getNormalMatrix(mw);
+			const ehRSolido = dados.malha.name === 'malha-r-solido';
 
 			for (let i = 0; i < dados.arestas.length; i++) {
 				const ar = dados.arestas[i];
@@ -332,6 +340,7 @@ export class MotorVisibilidadeHlr {
 
 				arestasProj.push({
 					malhaId: dados.id,
+					ehRSolido,
 					mascara: dados.mascara,
 					ehConstrucao: false,
 					ehPonteW: false,
@@ -416,6 +425,7 @@ export class MotorVisibilidadeHlr {
 
 			arestasProj.push({
 				malhaId: -1,
+				ehRSolido: false,
 				ehConstrucao: true,
 				ehPonteW: Boolean(c.ehPonteW),
 				x1,
@@ -603,7 +613,7 @@ export class MotorVisibilidadeHlr {
 
 			for (let k = 0; k < lista.length; k++) {
 				const tri = tris[lista[k]];
-				if (tri.malhaId === malhaIdPropria) continue;
+				if (tri.malhaId === malhaIdPropria || tri.ehRSolido) continue;
 				if (
 					sx < tri.minX - margemBboxTriPx ||
 					sx > tri.maxX + margemBboxTriPx ||
@@ -640,7 +650,7 @@ export class MotorVisibilidadeHlr {
 		// da ponte de construção (tolerância ~1,5 px em escala 1): somente nesse caso o chanfro
 		// lateral interno da haste esquerda do W fica atrás do vão e libera a ponte em 3D.
 		let wPonteAlinhada = false;
-		const tolAlinhamentoW = 0.004 * escalaCubo;
+		const tolAlinhamentoW = 0.004 * escalaMundo;
 		const tolAlinhamentoW2 = tolAlinhamentoW * tolAlinhamentoW;
 		for (let m = 0; m < malhas.length; m++) {
 			if (visibilidadeMalha[m] === 0) continue;
@@ -791,8 +801,8 @@ export class MotorVisibilidadeHlr {
 				const my = ar.y1 + dy * tMid;
 				const mz = ar.z1 + dz * tMid;
 
-				// 5b. Remoção de emenda coplanar entre peças (somente quando encostadas)
-				if (!ar.ehConstrucao && ar.local && !ar.local.ehExtra) {
+				// 5b. Remoção de emenda coplanar entre peças (somente quando encostadas; nunca com `malha-r-solido` em voo)
+				if (!ar.ehConstrucao && !ar.ehRSolido && ar.local && !ar.local.ehExtra) {
 					const wx = ar.wax + (ar.wbx - ar.wax) * tMid;
 					const wy = ar.way + (ar.wby - ar.way) * tMid;
 					const wz = ar.waz + (ar.wbz - ar.waz) * tMid;

@@ -1,3 +1,10 @@
+import {
+	COSSENO_ELEVACAO,
+	DX_EIXO_PX,
+	DY_EIXO_PX,
+	ESCALA_PX_POR_UNIDADE,
+} from '../constantes';
+
 export interface ArestaConstrucao3D {
 	ax: number;
 	ay: number;
@@ -153,4 +160,31 @@ export function gerarArestasConstrucao(
 	}
 
 	return arestas;
+}
+
+/**
+ * Gera o atributo `d` de um asterisco isométrico 2D (3 eixos ortogonais do cubo
+ * projetados pela mesma câmera ortográfica de `constantes.ts`), centrado em (0, 0).
+ * Reutilizado nas extremidades da barra de carregamento da splash.
+ */
+export function gerarPathAsterisco2D(raioPx = 6.5): string {
+	const compXZ = Math.hypot(DX_EIXO_PX, DY_EIXO_PX);
+	const cosIso = DX_EIXO_PX / compXZ;
+	const sinIso = DY_EIXO_PX / compXZ;
+	const razaoY = (ESCALA_PX_POR_UNIDADE * COSSENO_ELEVACAO) / compXZ;
+
+	const fmt = (v: number): string => {
+		const r = Math.round(v * 100) / 100;
+		return r === 0 ? '0' : String(r);
+	};
+
+	const rx = raioPx * cosIso;
+	const ry = raioPx * sinIso;
+	const rVert = raioPx * razaoY;
+
+	return [
+		`M0 ${fmt(-rVert)}L0 ${fmt(rVert)}`,
+		`M${fmt(-rx)} ${fmt(-ry)}L${fmt(rx)} ${fmt(ry)}`,
+		`M${fmt(-rx)} ${fmt(ry)}L${fmt(rx)} ${fmt(-ry)}`,
+	].join('');
 }
