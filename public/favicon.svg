@@ -1,9 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="geometricPrecision">
-	<rect data-favicon-placa="clara" x="0.45" y="0.45" width="31.1" height="31.1" rx="6.27" fill="#FAFAF8" stroke="#E4E3DF" stroke-width="0.9"/>
-	<path data-logo-face="interna-simplificada" fill="#EBEAE6" d="M13 14L16 14L25 9L16 4.5L7 9L7 10.5L7 20L10 15.5L13 23Z"/>
-	<path data-logo-face="topo" fill="#FFFFFF" stroke="#171717" stroke-width="1" stroke-linejoin="miter" stroke-miterlimit="3" d="M16 2.5L28 9L16 15.5L13 14L16 14L25 9L16 4.5L7 9L7 10.5L4 9Z"/>
-	<path data-logo-face="w-externa" fill="#171717" d="M4 9L7 10.5L7 20L10 15.5L13 23L13 14L16 15.5L16 29.5L13 28L10 20.5L7 24.5L4 23Z"/>
-	<path data-logo-face="r-externa" fill="#CD9016" fill-rule="evenodd" d="M26 10.5L27 11L27 11.5L28 12.5L28 15L27 17.5L25 19.5L28 23L25 24.5L22 21L19 23L19 28L16 29.5L16 15.5L24 11ZM24 13.5L24 14L19 17L19 20.5L24 17.5L24 17L25 16L25 15L25 14.5L25 14Z"/>
-	<path data-logo-camada="contorno-r" fill="none" stroke="#171717" stroke-width="0.9" stroke-linejoin="round" d="M26 10.5L27 11L27 11.5L28 12.5L28 15L27 17.5L25 19.5L28 23L25 24.5L22 21L19 23L19 28L16 29.5L16 15.5L24 11Z"/>
-	<path data-logo-camada="espinha" fill="none" stroke="#171717" stroke-width="0.9" stroke-linecap="butt" d="M16 15.5L16 29.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="geometricPrecision">
+	<rect data-favicon-placa="clara" x="0.23" y="0.23" width="15.55" height="15.55" rx="3.13" fill="#FAFAF8" stroke="#E4E3DF" stroke-width="0.45"/>
+	<path data-logo-camada="contorno-topo" fill="#171717" d="M2 4L8 1L14 4L14 5L8 2L2 5Z"/>
+	<path data-logo-face="interna-simplificada" fill="#C6C5C1" d="M7 8L8 7L12 5L8 3L4 5L3 6L3 11L5 8L7 12Z"/>
+	<path data-logo-face="topo" fill="#FFFFFF" d="M8 2L14 5L8 8L7 8L8 7L12 5L8 3L4 5L3 6L2 5Z"/>
+	<path data-logo-face="w-externa" fill="#171717" d="M2 5L3 6L3 11L5 8L7 12L7 8L8 8L8 15L7 15L5 11L3 13L2 12Z"/>
+	<path data-logo-face="r-externa" fill="#CD9016" fill-rule="evenodd" d="M13 6L14 6L14 7L14 8L13 9L12 10L14 12L13 13L11 11L9 12L9 15L8 15L8 8L12 6ZM12 7L9 9L9 10L12 9L13 8Z"/>
 </svg>

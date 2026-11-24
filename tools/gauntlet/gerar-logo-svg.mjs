@@ -9,8 +9,8 @@
  * Produz:
  * - `src/assets/logo/whiteroom-logo.svg` (completa, viewBox 0 0 1024 1024, contorno 5,50)
  * - `src/assets/logo/whiteroom-logo-header.svg` (sem construção, viewBox 580×580 justo, contorno 10,00 p/ 40 px)
- * - `public/favicon.svg` (versão simplificada derivada do 3D em grade 32×32, placa #FAFAF8 rx 21% + borda #E4E3DF)
- * - `public/favicon.ico` (multi-tamanho 16 e 32 px simplificados + 48 px completo na placa #FAFAF8, PNG-dentro-de-ICO)
+ * - `public/favicon.svg` (versão simplificada 16×16 dedicada derivada do 3D em coordenadas inteiras, placa #FAFAF8 rx 21% + borda #E4E3DF)
+ * - `public/favicon.ico` (multi-tamanho: 16 px flat-palette dedicado + 32 px simplificado + 48 px completo na placa #FAFAF8, PNG-dentro-de-ICO)
  * - `public/apple-touch-icon.png` (180×180, fundo quadrado opaco #FAFAF8, ~12% margem, contorno 5,50)
  * - `public/icon-192.png` (192×192, purpose "any", placa arredondada #FAFAF8 rx 21% + transparente fora)
  * - `public/icon-512.png` (512×512, purpose "any", placa arredondada #FAFAF8 rx 21% + transparente fora)
@@ -70,13 +70,16 @@ const COR_BORDA_PLACA = '#E4E3DF';
 
 // Enquadramentos quadrados derivados da caixa exata do cubo (~478,8 × 545,7 sem stroke, ~552 com stroke):
 // - Header (40 px): 580 → ~2,5% respiro vertical, cubo ~38 px dentro dos 40 px
-// - Favicon simplificado (16 e 32 px + favicon.svg): viewBox 32×32 com placa #FAFAF8 (rx 21%) e respiro 8%
+// - Favicon 16×16 dedicado (favicon.svg + entrada 16×16 do .ico): grade inteira 16×16 com placa #FAFAF8 (rx 21%) e respiro 8%
+// - Favicon 32×32 simplificado (entrada 32×32 do .ico): viewBox 32×32 com placa #FAFAF8 (rx 21%) e respiro 8%
 // - Favicon 48 px completo: 658 → ~8,5% margem ao redor do cubo na placa #FAFAF8 (rx 21%)
 // - App icons (180/192/512 px): 726 → ~12% margem ao redor do cubo
 // - Maskable icon (512 px): 740 → cubo inteiro dentro do círculo seguro central de 80% (diâmetro máx 75,9%)
 export const HEADER_VIEWBOX_LADO = 580;
+export const FAVICON_16_LADO = 16;
 export const FAVICON_SIMPLIFICADO_LADO = 32;
 export const FAVICON_SIMPLIFICADO_MARGEM_FRAC = 0.08;
+export const FAVICON_16_Y_OFFSET = 0.55;
 export const FAVICON_48_VIEWBOX_LADO = 658;
 export const APP_ICON_VIEWBOX_LADO = 726;
 export const MASKABLE_ICON_VIEWBOX_LADO = 740;
@@ -747,11 +750,11 @@ function extrairCadeiaEntre(pts, iIni, iFim) {
 }
 
 /**
- * Constrói o SVG simplificado para 16 e 32 px (`public/favicon.svg` e entradas 16/32 do `.ico`)
- * diretamente a partir dos polígonos 3D extraídos (`topo`, `w-externa`, `r-externa`),
- * descartando janelas, porta, sombras e divisórias internas e ajustando os polígonos à grade 32×32.
+ * Extrai a geometria simplificada única a partir dos polígonos 3D reais (`topo`, `w-externa`, `r-externa`),
+ * descartando janelas, porta, sombras e divisórias finas. Compartilhada entre a grade dedicada 16×16
+ * e a grade 32×32.
  */
-function montarFaviconSimplificado(camadas) {
+function extrairGeometriaFaviconSimplificado(camadas) {
 	const porNome = new Map(camadas.map((c) => [c.nome, c]));
 	const ordenarPorArea = (pols) =>
 		[...pols].sort((a, b) => Math.abs(areaPoligono(b)) - Math.abs(areaPoligono(a)));
@@ -818,6 +821,39 @@ function montarFaviconSimplificado(camadas) {
 	// Ponto frontal do encontro topo↔W↔R (vértice de maior Y do topo)
 	const topoFrontal = topoClean.reduce((best, p) => (p.y > best.y ? p : best), topoClean[0]);
 
+	return {
+		topoClean,
+		wClean,
+		rExtClean,
+		rFuroClean,
+		cavidadeClean,
+		topoFrontal,
+		cubeW,
+		cubeH,
+		cubeCx,
+		cubeCy,
+		maxY,
+	};
+}
+
+/**
+ * Constrói o SVG simplificado 32×32 (entrada 32×32 do `favicon.ico`) a partir da geometria 3D extraída.
+ */
+function montarFaviconSimplificado32(geom) {
+	const {
+		topoClean,
+		wClean,
+		rExtClean,
+		rFuroClean,
+		cavidadeClean,
+		topoFrontal,
+		cubeW,
+		cubeH,
+		cubeCx,
+		cubeCy,
+		maxY,
+	} = geom;
+
 	const lado = FAVICON_SIMPLIFICADO_LADO;
 	const disponivel = lado * (1 - 2 * FAVICON_SIMPLIFICADO_MARGEM_FRAC);
 	const escala = disponivel / Math.max(cubeW, cubeH);
@@ -869,6 +905,162 @@ function montarFaviconSimplificado(camadas) {
 	);
 
 	return linhas.join('\n');
+}
+
+/**
+ * Projeta a geometria simplificada 3D em coordenadas inteiras puras da grade 16×16.
+ * - Sem contorno escuro sobre o R (mantém #CD9016 puro e furo claro nítido).
+ * - Vãos do W em colunas inteiras distintas (colunas 3 e 6 livres entre hastes 2, 4-5 e 7).
+ * - Moldura externa escura (`topoMoldura`) desenhada atrás do aro branco (`topo`), preservando
+ *   aro #FFFFFF contínuo de >= 1 px separado do quarto interno (#C6C5C1) e da placa (#FAFAF8).
+ */
+function derivarGradeFavicon16(geom) {
+	const { topoClean, wClean, rExtClean, rFuroClean, cavidadeClean, cubeW, cubeH, cubeCx, cubeCy } = geom;
+
+	const lado = FAVICON_16_LADO;
+	const disponivel = lado * (1 - 2 * FAVICON_SIMPLIFICADO_MARGEM_FRAC);
+	const escala = disponivel / Math.max(cubeW, cubeH);
+	const centro = lado / 2;
+
+	const mapearInt = (pts) =>
+		deduplicarConsecutivos(
+			pts.map((p) => ({
+				x: Math.round(centro + (p.x - cubeCx) * escala),
+				y: Math.round(centro + (p.y - cubeCy) * escala + FAVICON_16_Y_OFFSET),
+			})),
+		);
+
+	const topoGrid = mapearInt(topoClean);
+	const wGrid = mapearInt(wClean);
+	const rExtGrid = mapearInt(rExtClean);
+	const cavGrid = mapearInt(cavidadeClean);
+
+	// Garante barra inferior sólida de >= 1 px no R entre o furo e o recorte da perna
+	const rFuroBrutoGrid = mapearInt(rFuroClean);
+	const yRecorteR = rExtGrid.reduce(
+		(best, p) => (p.x > centro && p.x <= centro + 3 && p.y >= 10 && p.y <= 12 ? Math.min(best, p.y) : best),
+		11,
+	);
+	const maxFuroY = yRecorteR - 1;
+	const rFuroGrid = deduplicarConsecutivos(
+		rFuroBrutoGrid.map((p) => ({ x: p.x, y: Math.min(p.y, maxFuroY) })),
+	);
+
+	// Moldura externa escura da cumeeira traseira (esquerda → topo → direita), deslocada 1 px para cima
+	// atrás do aro branco para emoldurar o #FFFFFF sobre a placa #FAFAF8 sem roubar pixels do aro.
+	const cristaExterna = [topoGrid[topoGrid.length - 1], topoGrid[0], topoGrid[1]];
+	const topoMolduraGrid = deduplicarConsecutivos([
+		...cristaExterna.map((p) => ({ x: p.x, y: Math.max(1, p.y - 1) })),
+		topoGrid[1],
+		topoGrid[0],
+		topoGrid[topoGrid.length - 1],
+	]);
+
+	return {
+		lado,
+		topoGrid,
+		topoMolduraGrid,
+		cavGrid,
+		wGrid,
+		rExtGrid,
+		rFuroGrid,
+	};
+}
+
+/**
+ * Constrói `public/favicon.svg` em `viewBox="0 0 16 16"` com todos os vértices do cubo em inteiros
+ * da grade 16×16 e placa clara `#FAFAF8` (`rx = 21%`, borda `#E4E3DF`).
+ */
+function montarFavicon16Svg(grade16) {
+	const { lado, topoGrid, topoMolduraGrid, cavGrid, wGrid, rExtGrid, rFuroGrid } = grade16;
+	const bordaSw = 0.45;
+	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
+	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
+	const rectSize = Number((lado - bordaSw).toFixed(2));
+	const rectOff = Number((bordaSw / 2).toFixed(2));
+
+	const linhas = [
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision">`,
+		`\t<rect data-favicon-placa="clara" x="${rectOff}" y="${rectOff}" width="${rectSize}" height="${rectSize}" rx="${rxInset}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${bordaSw}"/>`,
+		`\t<path data-logo-camada="contorno-topo" fill="${COR_CONTORNO}" d="${poligonoParaD(topoMolduraGrid)}"/>`,
+	];
+
+	if (cavGrid.length >= 3) {
+		linhas.push(
+			`\t<path data-logo-face="interna-simplificada" fill="${PALETA[IDX_SOMBRA].hex}" d="${poligonoParaD(cavGrid)}"/>`,
+		);
+	}
+
+	linhas.push(
+		`\t<path data-logo-face="topo" fill="${PALETA[IDX_TOPO].hex}" d="${poligonoParaD(topoGrid)}"/>`,
+		`\t<path data-logo-face="w-externa" fill="${PALETA[IDX_W].hex}" d="${poligonoParaD(wGrid)}"/>`,
+		`\t<path data-logo-face="r-externa" fill="${PALETA[IDX_R].hex}" fill-rule="evenodd" d="${poligonoParaD(rExtGrid)}${poligonoParaD(rFuroGrid)}"/>`,
+		'</svg>',
+		'',
+	);
+
+	return linhas.join('\n');
+}
+
+function pontoDentroPoligono(x, y, poly) {
+	let inside = false;
+	for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+		const xi = poly[i].x;
+		const yi = poly[i].y;
+		const xj = poly[j].x;
+		const yj = poly[j].y;
+		const intersect = (yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+		if (intersect) inside = !inside;
+	}
+	return inside;
+}
+
+/**
+ * Rasteriza a entrada 16×16 de `public/favicon.ico` com pixels chapados da paleta exata
+ * sobre a placa arredondada `#FAFAF8` (amostragem exata no centro `(x + 0,5, y + 0,5)` de cada pixel).
+ */
+async function rasterizarFavicon16FlatPng(grade16) {
+	const { lado, topoGrid, topoMolduraGrid, cavGrid, wGrid, rExtGrid, rFuroGrid } = grade16;
+	const bordaSw = 0.45;
+	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
+	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
+	const rectSize = Number((lado - bordaSw).toFixed(2));
+	const rectOff = Number((bordaSw / 2).toFixed(2));
+
+	const placaSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lado}" height="${lado}" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision"><rect x="${rectOff}" y="${rectOff}" width="${rectSize}" height="${rectSize}" rx="${rxInset}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${bordaSw}"/></svg>`;
+	const placaRaw = await sharp(Buffer.from(placaSvg)).resize(lado, lado).ensureAlpha().raw().toBuffer();
+	const rgba = Buffer.from(placaRaw);
+
+	const cDark = PALETA[IDX_W];
+	const cCav = PALETA[IDX_SOMBRA];
+	const cTopo = PALETA[IDX_TOPO];
+	const cR = PALETA[IDX_R];
+
+	const pintar = (x, y, cor) => {
+		const o = (y * lado + x) * 4;
+		rgba[o] = cor.r;
+		rgba[o + 1] = cor.g;
+		rgba[o + 2] = cor.b;
+		rgba[o + 3] = 255;
+	};
+
+	for (let y = 0; y < lado; y++) {
+		const cy = y + 0.5;
+		for (let x = 0; x < lado; x++) {
+			const cx = x + 0.5;
+			if (pontoDentroPoligono(cx, cy, topoMolduraGrid)) pintar(x, y, cDark);
+			if (cavGrid.length >= 3 && pontoDentroPoligono(cx, cy, cavGrid)) pintar(x, y, cCav);
+			if (pontoDentroPoligono(cx, cy, topoGrid)) pintar(x, y, cTopo);
+			if (pontoDentroPoligono(cx, cy, wGrid)) pintar(x, y, cDark);
+			if (pontoDentroPoligono(cx, cy, rExtGrid) && !pontoDentroPoligono(cx, cy, rFuroGrid)) {
+				pintar(x, y, cR);
+			}
+		}
+	}
+
+	return sharp(rgba, { raw: { width: lado, height: lado, channels: 4 } })
+		.png({ compressionLevel: 9 })
+		.toBuffer();
 }
 
 function montarSvgSemConstrucao({
@@ -994,8 +1186,13 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 		espContorno: ESPESSURA_CONTORNO_HEADER,
 	});
 
-	// Favicon SVG: versão simplificada derivada do 3D em grade 32×32 com placa #FAFAF8 (rx 21%) + borda #E4E3DF
-	const faviconSvg = montarFaviconSimplificado(camadas);
+	// Geometria simplificada única derivada do 3D:
+	// - Grade 16×16 dedicada (coordenadas inteiras) para `public/favicon.svg` e entrada 16×16 flat-palette do `.ico`
+	// - Grade 32×32 simplificada preservada para a entrada 32×32 do `.ico`
+	const geomSimplificada = extrairGeometriaFaviconSimplificado(camadas);
+	const gradeFavicon16 = derivarGradeFavicon16(geomSimplificada);
+	const faviconSvg = montarFavicon16Svg(gradeFavicon16);
+	const svgFavicon32 = montarFaviconSimplificado32(geomSimplificada);
 
 	// Favicon 48 px: versão completa legível dentro da mesma placa arredondada #FAFAF8 (~8,5% respiro)
 	const svgFavicon48 = montarSvgSemConstrucao({
@@ -1042,8 +1239,8 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 	});
 
 	const [png16, png32, png48, appleTouch180, icon192, icon512, iconMaskable512] = await Promise.all([
-		renderizarIconePng(faviconSvg, 16, null),
-		renderizarIconePng(faviconSvg, 32, null),
+		rasterizarFavicon16FlatPng(gradeFavicon16),
+		renderizarIconePng(svgFavicon32, 32, null),
 		renderizarIconePng(svgFavicon48, 48, null),
 		renderizarIconePng(svgAppleTouch, 180, COR_PAPEL),
 		renderizarIconePng(svgAndroidAny, 192, null),
@@ -1096,7 +1293,10 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 			espContorno: ESPESSURA_CONTORNO_HEADER,
 		},
 		faviconSpec: {
-			simplificadoViewBox: FAVICON_SIMPLIFICADO_LADO,
+			faviconSvgViewBox: FAVICON_16_LADO,
+			favicon16Modo: 'grade-16-inteira-flat-palette',
+			favicon16YOffset: FAVICON_16_Y_OFFSET,
+			simplificado32ViewBox: FAVICON_SIMPLIFICADO_LADO,
 			simplificadoMargemFrac: FAVICON_SIMPLIFICADO_MARGEM_FRAC,
 			placaRaioFrac: PLACA_RAIO_FRAC,
 			placaCor: COR_PAPEL,
