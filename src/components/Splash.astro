@@ -8,12 +8,12 @@ import { LOGO_SVG } from '../scripts/splash/logo';
 	data-splash-overlay
 	data-splash-ref-jpg={refJpg.src}
 	aria-hidden="true"
-	class="fixed inset-0 z-9999 select-none"
+	class="fixed inset-0 z-9999 overflow-hidden overscroll-none touch-none select-none"
 >
 	<div data-splash-fundo class="absolute inset-0 bg-papel"></div>
 	<div
 		data-splash-logo
-		class="pointer-events-none relative z-10 block aspect-square w-full max-w-[100vh] [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
+		class="pointer-events-none relative z-10 block aspect-square w-full max-w-[100dvh] [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
 	>
 		<Fragment set:html={LOGO_SVG} />
 	</div>

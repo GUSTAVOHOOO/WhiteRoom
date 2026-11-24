@@ -11,6 +11,18 @@ import {
 
 const DISTANCIA_CAMERA = 10;
 
+/**
+ * Fator de enquadramento para telas retrato (celular e tablet):
+ * no quadrado de referência 1024×1024 o cubo ocupa 46,74% da largura;
+ * 46,74% × 1,175 = 54,92% (~55% da menor dimensão). Em paisagem e desktop
+ * permanece 1 (idêntico à T2/T4/T5).
+ */
+export const ESCALA_ENQUADRAMENTO_RETRATO = 1.175;
+
+export function calcularEscalaEnquadramento(largura: number, altura: number): number {
+	return altura > largura ? ESCALA_ENQUADRAMENTO_RETRATO : 1;
+}
+
 export function criarCameraCubo(): THREE.OrthographicCamera {
 	const metade = FRUSTUM_CUBO / 2;
 	const camera = new THREE.OrthographicCamera(-metade, metade, metade, -metade, 0.1, 40);
@@ -37,10 +49,11 @@ export function atualizarEnquadramentoCamera(
 	camera: THREE.OrthographicCamera,
 	largura: number,
 	altura: number,
+	escalaEnquadramento = 1,
 ): void {
 	const w = Math.max(1, largura);
 	const h = Math.max(1, altura);
-	const lado = Math.min(w, h);
+	const lado = Math.round(Math.min(w, h) * Math.max(0.01, escalaEnquadramento));
 
 	const meiaLargura = (FRUSTUM_CUBO / 2) * (w / lado);
 	const meiaAltura = (FRUSTUM_CUBO / 2) * (h / lado);

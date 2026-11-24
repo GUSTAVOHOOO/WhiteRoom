@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import * as THREE from 'three';
-import { atualizarEnquadramentoCamera } from './cena/camera';
+import { atualizarEnquadramentoCamera, calcularEscalaEnquadramento } from './cena/camera';
 import { COSSENO_ELEVACAO, FRUSTUM_CUBO } from './cena/constantes';
 import { criarCena } from './cena/cubo';
 import { POSICOES_FINAIS } from './cena/pecas';
@@ -53,6 +53,7 @@ interface EstadoCoreografia {
 interface MetricasLayout {
 	largura: number;
 	altura: number;
+	escalaEnquadramento: number;
 	pixelsPorUnidade: number;
 	wInicio: THREE.Vector3;
 	rInicio: THREE.Vector3;
@@ -234,6 +235,7 @@ export function criarAnimacaoControlavel(
 	const layout: MetricasLayout = {
 		largura: 1,
 		altura: 1,
+		escalaEnquadramento: 1,
 		pixelsPorUnidade: 1,
 		wInicio: new THREE.Vector3(),
 		rInicio: new THREE.Vector3(),
@@ -464,7 +466,7 @@ export function criarAnimacaoControlavel(
 			progressoPonteW: estado.wPosT,
 			pulsoConstrucao: estado.pulsoLinhas,
 			matrizConstrucao,
-			escalaCubo: 1,
+			escalaCubo: layout.escalaEnquadramento,
 		});
 	};
 
@@ -507,13 +509,15 @@ export function criarAnimacaoControlavel(
 		// Dimensiona canvas, HLR e SVG final pelo tamanho real do container (nunca por window.innerWidth)
 		const w = Math.max(1, container.clientWidth || window.innerWidth);
 		const h = Math.max(1, container.clientHeight || window.innerHeight);
-		const lado = Math.min(w, h);
+		const escalaEnquadramento = calcularEscalaEnquadramento(w, h);
+		const lado = Math.round(Math.min(w, h) * escalaEnquadramento);
 		const pixelsPorUnidade = lado / FRUSTUM_CUBO;
 		const meiaLargura = (FRUSTUM_CUBO / 2) * (w / lado);
 		const meiaAltura = (FRUSTUM_CUBO / 2) * (h / lado);
 
 		layout.largura = w;
 		layout.altura = h;
+		layout.escalaEnquadramento = escalaEnquadramento;
 		layout.pixelsPorUnidade = pixelsPorUnidade;
 
 		// Posições iniciais fora da viewport (retrato e paisagem)
@@ -540,8 +544,11 @@ export function criarAnimacaoControlavel(
 		// Enquadramento exato 1:1 da logo SVG final sobre o quadrado 1024×1024 da câmera ortográfica.
 		// Mantém left/top em 0 e aplica o deslocamento inicial no `transform` para precisão subpixel
 		// real (evita snap de 0,5 px do layout em larguras ímpares como 1265 px / 375 px).
-		const ratio = Math.min(dprFixo ?? (window.devicePixelRatio || 1), 3);
-		const snapDevicePx = (v: number): number => Math.round(v * ratio) / ratio;
+		// Em telas de celular (menor dimensão <= 500 CSS px), limita o WebGL a dpr 2
+		// (reduz em ~56% os pixels rasterizados em aparelhos dpr 3 mantendo o SVG vetorial nítido).
+		const tetoDpr = Math.min(w, h) <= 500 ? 2 : 3;
+		const ratio = Math.min(dprFixo ?? (window.devicePixelRatio || 1), tetoDpr);
+		const snapDevicePx = (v: number): number => Math.round(v);
 
 		const svgLeft = (w - lado) / 2;
 		const svgTop = (h - lado) / 2;
@@ -587,7 +594,7 @@ export function criarAnimacaoControlavel(
 		// Atualiza renderer, câmera e dimensões SVG e renderiza na pose atual
 		renderer.setPixelRatio(ratio);
 		renderer.setSize(w, h, false);
-		atualizarEnquadramentoCamera(camera, w, h);
+		atualizarEnquadramentoCamera(camera, w, h, escalaEnquadramento);
 		linhas.definirDimensoes(w, h);
 		renderizarQuadro(false);
 	};
@@ -759,6 +766,8 @@ export function criarAnimacaoControlavel(
 		typeof ResizeObserver !== 'undefined' ? new ResizeObserver(agendarResize) : null;
 	resizeObserver?.observe(container);
 	window.addEventListener('resize', agendarResize);
+	window.addEventListener('orientationchange', agendarResize);
+	window.visualViewport?.addEventListener('resize', agendarResize);
 
 	// Inicializa no quadro t = 0
 	timeline.pause(0);
@@ -1021,6 +1030,8 @@ export function criarAnimacaoControlavel(
 			destruida = true;
 			window.cancelAnimationFrame(resizeRaf);
 			window.removeEventListener('resize', agendarResize);
+			window.removeEventListener('orientationchange', agendarResize);
+			window.visualViewport?.removeEventListener('resize', agendarResize);
 			resizeObserver?.disconnect();
 			tlPular?.kill();
 			tlPular = null;

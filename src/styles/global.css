@@ -15,15 +15,27 @@ html {
 
 #wr-splash {
 	display: none;
+	touch-action: none;
+	overscroll-behavior: none;
 }
 
-html.splash-ativa {
+html.splash-ativa,
+html.splash-ativa body {
 	overflow: hidden;
+	overscroll-behavior: none;
+	height: 100%;
 }
 
 html.splash-ativa #wr-splash {
 	display: grid;
 	place-items: center;
+}
+
+@media (orientation: portrait) {
+	#wr-splash [data-splash-logo] {
+		width: 117.5%;
+		max-width: none;
+	}
 }
 
 html.splash-ativa [data-splash-alvo] {

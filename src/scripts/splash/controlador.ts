@@ -128,10 +128,44 @@ export function iniciarSplash(): void {
 	let tweenFallbackConstrucao: gsap.core.Tween | null = null;
 	let tweenFallbackContorno: gsap.core.Tween | null = null;
 	let tweenReduzida: gsap.core.Tween | null = null;
+	let suprimirProximoClickAte = 0;
+	let timerLimparClick: number | null = null;
 
 	const obterAlvo = (): AlvoHeader => ({
 		rect: alvoEl.getBoundingClientRect(),
 	});
+
+	const limparBloqueioClick = (): void => {
+		suprimirProximoClickAte = 0;
+		if (timerLimparClick !== null) {
+			window.clearTimeout(timerLimparClick);
+			timerLimparClick = null;
+		}
+		window.removeEventListener('click', bloquearClickFantasma, true);
+		window.removeEventListener('pointerdown', liberarBloqueioNoProximoToque, true);
+	};
+
+	const bloquearClickFantasma = (event: MouseEvent): void => {
+		if (performance.now() <= suprimirProximoClickAte) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+		}
+		limparBloqueioClick();
+	};
+
+	const liberarBloqueioNoProximoToque = (): void => {
+		limparBloqueioClick();
+	};
+
+	const armarBloqueioClickFantasma = (): void => {
+		suprimirProximoClickAte = performance.now() + 500;
+		window.addEventListener('click', bloquearClickFantasma, true);
+		if (timerLimparClick !== null) {
+			window.clearTimeout(timerLimparClick);
+		}
+		timerLimparClick = window.setTimeout(limparBloqueioClick, 520);
+	};
 
 	const limparTimers = (): void => {
 		if (timerTimeout3D !== null) {
@@ -168,6 +202,15 @@ export function iniciarSplash(): void {
 		window.removeEventListener('pointerdown', onPointerDown);
 		window.removeEventListener('keydown', onKeyDown);
 		window.removeEventListener('resize', onResize);
+		window.removeEventListener('orientationchange', onResize);
+		window.visualViewport?.removeEventListener('resize', onResize);
+		overlayEl.removeEventListener('touchmove', onTouchMove);
+
+		if (suprimirProximoClickAte > performance.now()) {
+			window.addEventListener('pointerdown', liberarBloqueioNoProximoToque, true);
+		} else {
+			limparBloqueioClick();
+		}
 
 		if (animacao3D) {
 			try {
@@ -336,8 +379,15 @@ export function iniciarSplash(): void {
 		executarFallback(VOO_PULAR_S);
 	};
 
+	const onTouchMove = (event: TouchEvent): void => {
+		event.preventDefault();
+	};
+
 	const onPointerDown = (event: PointerEvent): void => {
 		if (event.pointerType === 'mouse' && event.button !== 0) return;
+		event.preventDefault();
+		event.stopPropagation();
+		armarBloqueioClickFantasma();
 		pular();
 	};
 
@@ -366,6 +416,9 @@ export function iniciarSplash(): void {
 	window.addEventListener('pointerdown', onPointerDown);
 	window.addEventListener('keydown', onKeyDown);
 	window.addEventListener('resize', onResize);
+	window.addEventListener('orientationchange', onResize);
+	window.visualViewport?.addEventListener('resize', onResize);
+	overlayEl.addEventListener('touchmove', onTouchMove, { passive: false });
 
 	// Teto absoluto: garante que a splash nunca trava a página
 	timerTeto = window.setTimeout(() => {
