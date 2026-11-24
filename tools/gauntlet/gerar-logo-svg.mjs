@@ -9,7 +9,7 @@
  * Produz:
  * - `src/assets/logo/whiteroom-logo.svg` (completa, viewBox 0 0 1024 1024, contorno 5,50)
  * - `src/assets/logo/whiteroom-logo-header.svg` (sem construção, viewBox 580×580 justo, contorno 10,00 p/ 40 px)
- * - `public/favicon.svg` (versão simplificada 16×16 dedicada derivada do 3D em coordenadas inteiras, placa #FAFAF8 rx 21% + borda #E4E3DF)
+ * - `public/favicon.svg` (versão simplificada 32×32 derivada do 3D com bordas retas pares e diagonais 2:1, placa #FAFAF8 rx 21% + borda #E4E3DF)
  * - `public/favicon.ico` (multi-tamanho: 16 px flat-palette dedicado + 32 px simplificado + 48 px completo na placa #FAFAF8, PNG-dentro-de-ICO)
  * - `public/apple-touch-icon.png` (180×180, fundo quadrado opaco #FAFAF8, ~12% margem, contorno 5,50)
  * - `public/icon-192.png` (192×192, purpose "any", placa arredondada #FAFAF8 rx 21% + transparente fora)
@@ -70,8 +70,8 @@ const COR_BORDA_PLACA = '#E4E3DF';
 
 // Enquadramentos quadrados derivados da caixa exata do cubo (~478,8 × 545,7 sem stroke, ~552 com stroke):
 // - Header (40 px): 580 → ~2,5% respiro vertical, cubo ~38 px dentro dos 40 px
-// - Favicon 16×16 dedicado (favicon.svg + entrada 16×16 do .ico): grade inteira 16×16 com placa #FAFAF8 (rx 21%) e respiro 8%
-// - Favicon 32×32 simplificado (entrada 32×32 do .ico): viewBox 32×32 com placa #FAFAF8 (rx 21%) e respiro 8%
+// - Favicon 16×16 dedicado (entrada 16×16 do .ico): grade inteira 16×16 com placa #FAFAF8 (rx 21%) e respiro 8%
+// - Favicon 32×32 simplificado (`public/favicon.svg` + entrada 32×32 do .ico): viewBox 32×32 com bordas retas pares, diagonais 2:1 e placa #FAFAF8 (rx 21%)
 // - Favicon 48 px completo: 658 → ~8,5% margem ao redor do cubo na placa #FAFAF8 (rx 21%)
 // - App icons (180/192/512 px): 726 → ~12% margem ao redor do cubo
 // - Maskable icon (512 px): 740 → cubo inteiro dentro do círculo seguro central de 80% (diâmetro máx 75,9%)
@@ -80,6 +80,8 @@ export const FAVICON_16_LADO = 16;
 export const FAVICON_SIMPLIFICADO_LADO = 32;
 export const FAVICON_SIMPLIFICADO_MARGEM_FRAC = 0.08;
 export const FAVICON_16_Y_OFFSET = 0.55;
+export const FAVICON_32_CONTORNO_TOPO_H = 2.5;
+export const FAVICON_32_RIM_H = 3.5;
 export const FAVICON_48_VIEWBOX_LADO = 658;
 export const APP_ICON_VIEWBOX_LADO = 726;
 export const MASKABLE_ICON_VIEWBOX_LADO = 740;
@@ -837,46 +839,238 @@ function extrairGeometriaFaviconSimplificado(camadas) {
 }
 
 /**
- * Constrói o SVG simplificado 32×32 (entrada 32×32 do `favicon.ico`) a partir da geometria 3D extraída.
+ * Deriva a geometria simplificada 32×32 (para `public/favicon.svg` e entrada `32×32` do `.ico`)
+ * diretamente dos polígonos 3D extraídos (`topoClean`, `wClean`, `rExtClean`, `rFuroClean`),
+ * projetando o cubo sobre a grade 32×32 com:
+ * - Bordas retas verticais em coordenadas pares (x = 4, 6, 14, 16, 18, 24, 28), caindo na grade exata em 16 px.
+ * - Diagonais isométricas com inclinação exata de 2:1 (Δy = ±0,5·Δx) entre vértices pares.
+ * - Aro branco `#FFFFFF` contínuo (`FAVICON_32_RIM_H = 3,5` px), emoldurado atrás por `contorno-topo`
+ *   (`FAVICON_32_CONTORNO_TOPO_H = 2,5` px) e separado da cavidade interna `#C6C5C1`, sem fenda nem traço duplicado.
+ * - `W` em `#171717` com ambos os vãos abertos em ≥ 2 px claros em 32 px (colunas inteiras em 16 px).
+ * - `R` em `#CD9016` puro sem contorno escuro por cima, curva superior contínua e furo claro ≥ 2×2 em 32 px.
  */
-function montarFaviconSimplificado32(geom) {
-	const {
-		topoClean,
-		wClean,
-		rExtClean,
-		rFuroClean,
-		cavidadeClean,
-		topoFrontal,
-		cubeW,
-		cubeH,
-		cubeCx,
-		cubeCy,
-		maxY,
-	} = geom;
+function derivarGeometriaFavicon32(geom) {
+	const { topoClean, wClean, rExtClean, rFuroClean, cubeW, cubeH, cubeCx, cubeCy } = geom;
 
 	const lado = FAVICON_SIMPLIFICADO_LADO;
 	const disponivel = lado * (1 - 2 * FAVICON_SIMPLIFICADO_MARGEM_FRAC);
 	const escala = disponivel / Math.max(cubeW, cubeH);
 	const centro = lado / 2;
+	const yOffset = FAVICON_16_Y_OFFSET * 2;
 
-	// Ajuste à grade de pixels 32×32: X em inteiros (paredes verticais nítidas em 16 e 32 px: x=4, 16, 28)
-	// e Y em meio-pixel (preserva espessura uniforme de 2 px em todo o aro branco superior isométrico).
-	const mapear = (pts) =>
+	const mapRaw = (pts) =>
 		pts.map((p) => ({
-			x: Math.round(centro + (p.x - cubeCx) * escala),
-			y: Math.round((centro + (p.y - cubeCy) * escala) * 2) / 2,
+			x: centro + (p.x - cubeCx) * escala,
+			y: centro + (p.y - cubeCy) * escala + yOffset,
 		}));
 
-	const topoGrid = mapear(topoClean);
-	const wGrid = mapear(wClean);
-	const rExtGrid = mapear(rExtClean);
-	const rFuroGrid = mapear(rFuroClean);
-	const cavGrid = mapear(cavidadeClean);
-	const espinhaGrid = mapear([
-		{ x: cubeCx, y: topoFrontal.y },
-		{ x: cubeCx, y: maxY },
-	]);
+	const snapPar = (v) => Math.round(v / 2) * 2;
+	const snapMeio = (v) => Math.round(v * 2) / 2;
+	const snapQuarto = (v) => Math.round(v * 4) / 4;
+	const isoY = (x, x0, y0, sinal) => Number((y0 + sinal * 0.5 * (x - x0)).toFixed(2));
 
+	const topoRaw = mapRaw(topoClean);
+	const wRaw = mapRaw(wClean);
+	const rExtRaw = mapRaw(rExtClean);
+	const rFuroRaw = mapRaw(rFuroClean);
+
+	// 1. Quadro isométrico exato do cubo derivado dos extremos reais de topo, W e R
+	const topoPicoRaw = topoRaw.reduce((best, p) => (p.y < best.y ? p : best), topoRaw[0]);
+	const xCentro = snapPar(topoPicoRaw.x);
+	const xEsq = snapPar(Math.min(...topoRaw.map((p) => p.x)));
+	const xDir = snapPar(Math.max(...topoRaw.map((p) => p.x)));
+	const yTopoExt = snapPar(topoPicoRaw.y);
+	const yLat = isoY(xDir, xCentro, yTopoExt, +1);
+	const yFrente = isoY(xCentro, xDir, yLat, -1);
+
+	const maxYRaw = Math.max(...wRaw.map((p) => p.y), ...rExtRaw.map((p) => p.y));
+	const yBaseCentro = snapPar(maxYRaw);
+	const yBaseLat = isoY(xEsq, xCentro, yBaseCentro, +1);
+
+	// 2. Aro superior branco + moldura externa traseira atrás do aro (exact 2:1)
+	const contornoTopoH = Math.min(FAVICON_32_CONTORNO_TOPO_H, yTopoExt - 1.5);
+	const topoMoldura = [
+		{ x: xEsq, y: yLat - contornoTopoH },
+		{ x: xCentro, y: yTopoExt - contornoTopoH },
+		{ x: xDir, y: yLat - contornoTopoH },
+		{ x: xDir, y: yLat },
+		{ x: xCentro, y: yTopoExt },
+		{ x: xEsq, y: yLat },
+	];
+
+	const rimH = FAVICON_32_RIM_H;
+	const yTopoInt = yTopoExt + rimH;
+	const yFrenteInt = yFrente - rimH;
+	const dxInt = (yLat - yTopoInt) * 2;
+	const xIntEsq = xCentro - dxInt;
+	const xIntDir = xCentro + dxInt;
+
+	// 3. W derivado dos vértices de wRaw com hastes verticais em coordenadas pares e base 2:1
+	const wCandidatosEsqInt = wRaw.filter((p) => p.x > xEsq + 1 && p.x < xCentro - 7 && p.y < yFrente);
+	const wCandidatosDirInt = wRaw.filter((p) => p.x > xCentro - 4 && p.x < xCentro - 1 && p.y < yFrente + 2);
+	const xWEsqInt = snapPar(wCandidatosEsqInt[0]?.x ?? xEsq + 2);
+	const xWDirInt = snapPar(wCandidatosDirInt[0]?.x ?? xCentro - 2);
+	const yWTopEsq = isoY(xWEsqInt, xEsq, yLat, +1);
+	const yWTopDir = isoY(xWDirInt, xEsq, yLat, +1);
+
+	const wMiolo = wRaw.filter((p) => p.x > xWEsqInt + 1.5 && p.x < xWDirInt - 1.5);
+	const wPicoTopRaw = wMiolo.reduce((best, p) => (p.y < best.y ? p : best), wMiolo[0]);
+	const wPicoBotRaw = wMiolo.reduce((best, p) => (p.y > best.y ? p : best), wMiolo[0]);
+	const xWPico = snapPar(wPicoTopRaw.x);
+	const yWPicoTop = snapPar(wPicoTopRaw.y);
+	const yWPicoBot = snapPar(wPicoBotRaw.y);
+
+	const wValeEsqRaw = wRaw
+		.filter((p) => Math.abs(p.x - (wCandidatosEsqInt[0]?.x ?? xWEsqInt)) < 1.5 && p.y < yBaseLat)
+		.reduce((best, p) => (p.y > best.y ? p : best));
+	const wValeDirRaw = wRaw
+		.filter((p) => Math.abs(p.x - (wCandidatosDirInt[0]?.x ?? xWDirInt)) < 1.5 && p.y < yBaseLat + 2)
+		.reduce((best, p) => (p.y > best.y ? p : best));
+	// Garante abertura vertical generosa nos dois vãos do W sem fechar a base
+	const yWValeEsq = Math.min(snapPar(wValeEsqRaw.y), yWPicoBot - 2);
+	const yWValeDir = snapPar(wValeDirRaw.y);
+
+	const wPeEsqRaw = wRaw
+		.filter((p) => p.y > yBaseLat && p.x > xEsq + 1 && p.x < xWPico)
+		.reduce((best, p) => (p.y > best.y ? p : best));
+	const wPeDirRaw = wRaw
+		.filter((p) => p.y > yBaseLat + 2 && p.x > xWPico && p.x < xCentro - 1)
+		.reduce((best, p) => (p.y > best.y ? p : best));
+	const xWPeEsq = Math.round(wPeEsqRaw.x);
+	const yWPeEsq = isoY(xWPeEsq, xEsq, yBaseLat, +1);
+	const xWPeDir = Math.round(wPeDirRaw.x);
+	const yWPeDir = isoY(xWPeDir, xCentro, yBaseCentro, +1);
+
+	const wPoly = [
+		{ x: xEsq, y: yLat },
+		{ x: xWEsqInt, y: yWTopEsq },
+		{ x: xWEsqInt, y: yWValeEsq },
+		{ x: xWPico, y: yWPicoTop },
+		{ x: xWDirInt, y: yWValeDir },
+		{ x: xWDirInt, y: yWTopDir },
+		{ x: xCentro, y: yFrente },
+		{ x: xCentro, y: yBaseCentro },
+		{ x: xWPeDir, y: yWPeDir },
+		{ x: xWPico, y: yWPicoBot },
+		{ x: xWPeEsq, y: yWPeEsq },
+		{ x: xEsq, y: yBaseLat },
+	];
+
+	const yCavWDir = isoY(xWDirInt, xCentro, yFrenteInt, -1);
+	const cavidade = [
+		{ x: xWDirInt, y: yCavWDir },
+		{ x: xCentro, y: yFrenteInt },
+		{ x: xIntDir, y: yLat },
+		{ x: xCentro, y: yTopoInt },
+		{ x: xIntEsq, y: yLat },
+		{ x: xWEsqInt, y: yWTopEsq },
+		{ x: xWEsqInt, y: yWValeEsq },
+		{ x: xWPico, y: yWPicoTop },
+		{ x: xWDirInt, y: yWValeDir },
+	];
+
+	const topo = [
+		{ x: xCentro, y: yTopoExt },
+		{ x: xDir, y: yLat },
+		{ x: xCentro, y: yFrente },
+		{ x: xWDirInt, y: yWTopDir },
+		{ x: xWDirInt, y: yCavWDir },
+		{ x: xCentro, y: yFrenteInt },
+		{ x: xIntDir, y: yLat },
+		{ x: xCentro, y: yTopoInt },
+		{ x: xIntEsq, y: yLat },
+		{ x: xWEsqInt, y: yWTopEsq },
+		{ x: xEsq, y: yLat },
+	];
+
+	// 4. R derivado de rExtRaw + rFuroRaw com haste vertical par, curva suave no ombro/bojo,
+	//    furo claro >= 2×2 em 32 px e encontro sem fenda com a borda 2:1 do aro superior.
+	const rStemCand = rFuroRaw.filter((p) => p.x < xCentro + 4);
+	const xRStemInt = snapPar(Math.min(...rStemCand.map((p) => p.x)));
+	const yRBaseStem = isoY(xRStemInt, xCentro, yBaseCentro, -1);
+
+	// Ombro reto acompanha exatamente a borda 2:1 inferior do aro até xDir - 2 (sem fenda)
+	const xROmbro = xDir - 2;
+	const yROmbro = isoY(xROmbro, xCentro, yFrente, -1);
+
+	const rBojoVert = rExtRaw.filter((p) => p.x > xDir - 0.5 && p.y < yBaseLat - 2);
+	const yRBojoTop = snapPar(Math.min(...rBojoVert.map((p) => p.y)));
+	const yRBojoBot = snapMeio(Math.max(...rBojoVert.map((p) => p.y)));
+
+	const rJuncaoPernaRaw = rExtRaw.find((p) => p.x > xCentro + 6 && p.x < xDir - 1.5 && p.y > yRBojoBot + 1.5 && p.y < yBaseLat - 1);
+	const xRJuncaoPerna = Math.round(rJuncaoPernaRaw?.x ?? xDir - 3);
+	const yRJuncaoPerna = snapMeio(rJuncaoPernaRaw?.y ?? yRBojoBot + 4);
+
+	const rPeIntRaw = rExtRaw
+		.filter((p) => p.y > yBaseLat && p.x > xCentro + 5)
+		.reduce((best, p) => (p.y > best.y ? p : best));
+	// Mantém o pé direito do R com >= 4 px (2 px em 16×16) em vértices pares com inclinação 2:1
+	const xRPeInt = Math.min(xDir - 4, Math.floor(rPeIntRaw.x / 2) * 2);
+	const yRPeInt = isoY(xRPeInt, xCentro, yBaseCentro, -1);
+
+	// Furo do R: parede esquerda na coordenada par xRStemInt, bordas superior/inferior 2:1 e arco direito suave
+	const rFuroStemPts = rFuroRaw.filter((p) => Math.abs(p.x - Math.min(...rFuroRaw.map((q) => q.x))) < 0.8);
+	const yFuroTopRaw = Math.min(...rFuroStemPts.map((p) => p.y));
+	const yFuroBotRaw = Math.max(...rFuroStemPts.map((p) => p.y));
+	const yFuroTop = snapPar(yFuroTopRaw);
+	const furoAlt = Math.max(3.5, snapMeio(yFuroBotRaw - yFuroTopRaw));
+	const yFuroBot = Number((yFuroTop + furoAlt).toFixed(2));
+
+	// Mantém arco direito do R com >= 4 px em 32×32 (= 2 px inteiros em 16×16) e furo >= 2×2 nítido
+	const xFuroMaxRaw = Math.max(...rFuroRaw.map((p) => p.x));
+	const xFuroDir = Math.min(xDir - 4, snapPar(xFuroMaxRaw));
+	const xFuroCurvaIni = Number((xFuroDir - 1.5).toFixed(2));
+	const yFuroCurvaTop = isoY(xFuroCurvaIni, xRStemInt, yFuroTop, -1);
+	const yFuroCurvaBot = isoY(xFuroCurvaIni, xRStemInt, yFuroBot, -1);
+	const yFuroCtrlTop = isoY(xFuroDir, xRStemInt, yFuroTop, -1);
+	const yFuroCtrlBot = isoY(xFuroDir, xRStemInt, yFuroBot, -1);
+	const yFuroMeio = snapQuarto((yFuroCtrlTop + yFuroCtrlBot) / 2);
+
+	// Recorte sob o bojo garante barra horizontal-isométrica sólida >= 3 px abaixo do furo
+	const rJoelhoRaw = rExtRaw.find((p) => p.x > xRStemInt + 1.5 && p.x < xRJuncaoPerna && p.y > yFuroBot);
+	const xRJoelho = snapMeio(rJoelhoRaw?.x ?? xRStemInt + 3.5);
+	const yRRecorteStem = Math.max(snapMeio(yFuroBot + 3), snapMeio(yFuroBot + 2.5));
+	const yRJoelho = isoY(xRJoelho, xRStemInt, yRRecorteStem, -1);
+
+	const dRExterna = [
+		`M${fmtCoordCompacto(xCentro)} ${fmtCoordCompacto(yFrente)}`,
+		`L${fmtCoordCompacto(xROmbro)} ${fmtCoordCompacto(yROmbro)}`,
+		`Q${fmtCoordCompacto(xDir)} ${fmtCoordCompacto(yLat + 0.5)} ${fmtCoordCompacto(xDir)} ${fmtCoordCompacto(yRBojoTop)}`,
+		`L${fmtCoordCompacto(xDir)} ${fmtCoordCompacto(yRBojoBot)}`,
+		`Q${fmtCoordCompacto(xDir)} ${fmtCoordCompacto(yRJuncaoPerna - 1.5)} ${fmtCoordCompacto(xRJuncaoPerna)} ${fmtCoordCompacto(yRJuncaoPerna)}`,
+		`L${fmtCoordCompacto(xDir)} ${fmtCoordCompacto(yBaseLat)}`,
+		`L${fmtCoordCompacto(xRPeInt)} ${fmtCoordCompacto(yRPeInt)}`,
+		`L${fmtCoordCompacto(xRJoelho)} ${fmtCoordCompacto(yRJoelho)}`,
+		`L${fmtCoordCompacto(xRStemInt)} ${fmtCoordCompacto(yRRecorteStem)}`,
+		`L${fmtCoordCompacto(xRStemInt)} ${fmtCoordCompacto(yRBaseStem)}`,
+		`L${fmtCoordCompacto(xCentro)} ${fmtCoordCompacto(yBaseCentro)}Z`,
+	].join('');
+
+	const dRFuro = [
+		`M${fmtCoordCompacto(xRStemInt)} ${fmtCoordCompacto(yFuroTop)}`,
+		`L${fmtCoordCompacto(xRStemInt)} ${fmtCoordCompacto(yFuroBot)}`,
+		`L${fmtCoordCompacto(xFuroCurvaIni)} ${fmtCoordCompacto(yFuroCurvaBot)}`,
+		`Q${fmtCoordCompacto(xFuroDir)} ${fmtCoordCompacto(yFuroCtrlBot)} ${fmtCoordCompacto(xFuroDir)} ${fmtCoordCompacto(yFuroMeio)}`,
+		`Q${fmtCoordCompacto(xFuroDir)} ${fmtCoordCompacto(yFuroCtrlTop)} ${fmtCoordCompacto(xFuroCurvaIni)} ${fmtCoordCompacto(yFuroCurvaTop)}Z`,
+	].join('');
+
+	return {
+		lado,
+		topoMoldura,
+		cavidade,
+		topo,
+		wPoly,
+		dRExterna,
+		dRFuro,
+	};
+}
+
+/**
+ * Constrói `public/favicon.svg` em `viewBox="0 0 32 32"` (também usado na entrada `32×32` do `.ico`),
+ * preservando exatamente a placa clara `#FAFAF8` (`rx = 21%`, borda `#E4E3DF`).
+ */
+function montarFavicon32Svg(geom32) {
+	const { lado, topoMoldura, cavidade, topo, wPoly, dRExterna, dRFuro } = geom32;
 	const bordaSw = 0.9;
 	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
 	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
@@ -886,23 +1080,14 @@ function montarFaviconSimplificado32(geom) {
 	const linhas = [
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision">`,
 		`\t<rect data-favicon-placa="clara" x="${rectOff}" y="${rectOff}" width="${rectSize}" height="${rectSize}" rx="${rxInset}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${bordaSw}"/>`,
-	];
-
-	if (cavGrid.length >= 3) {
-		linhas.push(
-			`\t<path data-logo-face="interna-simplificada" fill="${PALETA[IDX_INTERNA].hex}" d="${poligonoParaD(cavGrid)}"/>`,
-		);
-	}
-
-	linhas.push(
-		`\t<path data-logo-face="topo" fill="${PALETA[IDX_TOPO].hex}" stroke="${COR_CONTORNO}" stroke-width="1" stroke-linejoin="miter" stroke-miterlimit="3" d="${poligonoParaD(topoGrid)}"/>`,
-		`\t<path data-logo-face="w-externa" fill="${PALETA[IDX_W].hex}" d="${poligonoParaD(wGrid)}"/>`,
-		`\t<path data-logo-face="r-externa" fill="${PALETA[IDX_R].hex}" fill-rule="evenodd" d="${poligonoParaD(rExtGrid)}${poligonoParaD(rFuroGrid)}"/>`,
-		`\t<path data-logo-camada="contorno-r" fill="none" stroke="${COR_CONTORNO}" stroke-width="0.9" stroke-linejoin="round" d="${poligonoParaD(rExtGrid)}"/>`,
-		`\t<path data-logo-camada="espinha" fill="none" stroke="${COR_CONTORNO}" stroke-width="0.9" stroke-linecap="butt" d="${poligonoParaD(espinhaGrid, false)}"/>`,
+		`\t<path data-logo-camada="contorno-topo" fill="${COR_CONTORNO}" d="${poligonoParaD(topoMoldura)}"/>`,
+		`\t<path data-logo-face="interna-simplificada" fill="${PALETA[IDX_SOMBRA].hex}" d="${poligonoParaD(cavidade)}"/>`,
+		`\t<path data-logo-face="topo" fill="${PALETA[IDX_TOPO].hex}" d="${poligonoParaD(topo)}"/>`,
+		`\t<path data-logo-face="w-externa" fill="${PALETA[IDX_W].hex}" d="${poligonoParaD(wPoly)}"/>`,
+		`\t<path data-logo-face="r-externa" fill="${PALETA[IDX_R].hex}" fill-rule="evenodd" d="${dRExterna}${dRFuro}"/>`,
 		'</svg>',
 		'',
-	);
+	];
 
 	return linhas.join('\n');
 }
@@ -965,41 +1150,6 @@ function derivarGradeFavicon16(geom) {
 		rExtGrid,
 		rFuroGrid,
 	};
-}
-
-/**
- * Constrói `public/favicon.svg` em `viewBox="0 0 16 16"` com todos os vértices do cubo em inteiros
- * da grade 16×16 e placa clara `#FAFAF8` (`rx = 21%`, borda `#E4E3DF`).
- */
-function montarFavicon16Svg(grade16) {
-	const { lado, topoGrid, topoMolduraGrid, cavGrid, wGrid, rExtGrid, rFuroGrid } = grade16;
-	const bordaSw = 0.45;
-	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
-	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
-	const rectSize = Number((lado - bordaSw).toFixed(2));
-	const rectOff = Number((bordaSw / 2).toFixed(2));
-
-	const linhas = [
-		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision">`,
-		`\t<rect data-favicon-placa="clara" x="${rectOff}" y="${rectOff}" width="${rectSize}" height="${rectSize}" rx="${rxInset}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${bordaSw}"/>`,
-		`\t<path data-logo-camada="contorno-topo" fill="${COR_CONTORNO}" d="${poligonoParaD(topoMolduraGrid)}"/>`,
-	];
-
-	if (cavGrid.length >= 3) {
-		linhas.push(
-			`\t<path data-logo-face="interna-simplificada" fill="${PALETA[IDX_SOMBRA].hex}" d="${poligonoParaD(cavGrid)}"/>`,
-		);
-	}
-
-	linhas.push(
-		`\t<path data-logo-face="topo" fill="${PALETA[IDX_TOPO].hex}" d="${poligonoParaD(topoGrid)}"/>`,
-		`\t<path data-logo-face="w-externa" fill="${PALETA[IDX_W].hex}" d="${poligonoParaD(wGrid)}"/>`,
-		`\t<path data-logo-face="r-externa" fill="${PALETA[IDX_R].hex}" fill-rule="evenodd" d="${poligonoParaD(rExtGrid)}${poligonoParaD(rFuroGrid)}"/>`,
-		'</svg>',
-		'',
-	);
-
-	return linhas.join('\n');
 }
 
 function pontoDentroPoligono(x, y, poly) {
@@ -1187,12 +1337,13 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 	});
 
 	// Geometria simplificada única derivada do 3D:
-	// - Grade 16×16 dedicada (coordenadas inteiras) para `public/favicon.svg` e entrada 16×16 flat-palette do `.ico`
-	// - Grade 32×32 simplificada preservada para a entrada 32×32 do `.ico`
+	// - Grade 16×16 dedicada (coordenadas inteiras) para a entrada 16×16 flat-palette do `.ico` (preservada da R3)
+	// - Grade 32×32 isométrica 2:1 em coordenadas pares para `public/favicon.svg` e entrada 32×32 do `.ico`
 	const geomSimplificada = extrairGeometriaFaviconSimplificado(camadas);
 	const gradeFavicon16 = derivarGradeFavicon16(geomSimplificada);
-	const faviconSvg = montarFavicon16Svg(gradeFavicon16);
-	const svgFavicon32 = montarFaviconSimplificado32(geomSimplificada);
+	const geomFavicon32 = derivarGeometriaFavicon32(geomSimplificada);
+	const faviconSvg = montarFavicon32Svg(geomFavicon32);
+	const svgFavicon32 = faviconSvg;
 
 	// Favicon 48 px: versão completa legível dentro da mesma placa arredondada #FAFAF8 (~8,5% respiro)
 	const svgFavicon48 = montarSvgSemConstrucao({
@@ -1293,7 +1444,10 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 			espContorno: ESPESSURA_CONTORNO_HEADER,
 		},
 		faviconSpec: {
-			faviconSvgViewBox: FAVICON_16_LADO,
+			faviconSvgViewBox: FAVICON_SIMPLIFICADO_LADO,
+			faviconSvgModo: 'grade-32-isometrica-2-1-par',
+			favicon32ContornoTopoH: FAVICON_32_CONTORNO_TOPO_H,
+			favicon32RimH: FAVICON_32_RIM_H,
 			favicon16Modo: 'grade-16-inteira-flat-palette',
 			favicon16YOffset: FAVICON_16_Y_OFFSET,
 			simplificado32ViewBox: FAVICON_SIMPLIFICADO_LADO,
