@@ -1,13 +1,13 @@
-# T2 — Estado do Gauntlet Loop (Passagem de Bastão → Rodada 7)
+# T2 — Estado do Gauntlet Loop (Passagem de Bastão → Rodada 8)
 
 Branch: `GUSTAVOHOOO/splash-t2-cubo` · Referência visual: `75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg` (`1024×1024`).
-Perfis SVG originais em `src/assets/logo/perfis/` estão **intactos** (nenhum SVG foi editado até a rodada 6). Nenhuma dependência nova foi adicionada ao `package.json` da raiz.
+Perfis SVG originais em `src/assets/logo/perfis/` estão **intactos** (nenhum SVG foi editado até a rodada 7). Nenhuma dependência nova foi adicionada ao `package.json` da raiz.
 
 ## 1. Arquitetura de `src/scripts/splash/cena/` e modos debug
 
 | Arquivo | Responsabilidade e símbolos principais |
 |---|---|
-| `constantes.ts` | Medidas de `geometria.json`, frustum (`3.025688`), elevação (`33.3712°`), ancoragem no topo, paleta `CORES`, espessura de traço (`5.5 px` / `1.45 px` em 1024), `SEGMENTOS_CURVA_R` (`64`), `SEGMENTOS_CURVA_R_HLR` (`32`) e `DIRECAO_LUZ_RAW` (`-0.335, 1.0, 0.26`). |
+| `constantes.ts` | Medidas de `geometria.json`, frustum (`3.025688`), elevação (`33.3712°`), ancoragem no topo, paleta `CORES` (`linhaConstrucao: '#A8A8A4'`), espessura de traço (`5.5 px` / `1.15 px` em 1024), `SEGMENTOS_CURVA_R` (`64`), `SEGMENTOS_CURVA_R_HLR` (`32`) e `DIRECAO_LUZ_RAW` (`-0.335, 1.0, 0.26`). |
 | `camera.ts` | `criarCameraCubo()`, `atualizarEnquadramentoCamera(camera, w, h)` — ortográfica 45°/33.37° em modo `contain` no quadrado `min(w, h)`. |
 | `luz.ts` | `criarLuzCena()` — `DirectionalLight` fixa, `shadow.mapSize = 4096²`, frustum `[-0.95, 0.95]`, `BasicShadowMap` (sem borrão). |
 | `materiais.ts` | `criarMaterialChapado(opcoes)` — `MeshLambertMaterial` (sem `polygonOffset`) + `onBeforeCompile` (cores chapadas por normal local + sombra dura em dois tons + máscaras `mascaraDireitaR` e `mascaraOmbroR`). |
@@ -18,7 +18,7 @@ Perfis SVG originais em `src/assets/logo/perfis/` estão **intactos** (nenhum SV
 | `linhas/construcao.ts` | `ARESTAS_CONSTRUCAO` — as 12 linhas virtuais de construção (asteriscos + prolongamentos do T0, com `T_left -X` estendida até `T_front` atravessando o vão do W), todas passando pelo HLR. |
 | `linhas/visibilidade.ts` | `MotorVisibilidadeHlr` — por quadro: projeta triângulos e arestas pela câmera ortográfica fixa, indexa em grade 2D `32×32`, corta arestas em todos os cruzamentos 2D e extremos colineares, remove emendas coplanares entre peças **somente quando encostadas** (teste de continuidade coplanar a `0,003 u`), aplica máscaras de descarte e testa oclusão ortográfica exata no ponto médio (`ε = 8e-6 NDC`). |
 | `linhas/encadear.ts` | `deduplicarEFundirColineares`, `subtrairCoincidentesComContorno`, `encadearEmPolilinhas` — deduplica segmentos coincidentes por reta suporte, subtrai trechos de construção cobertos pelo contorno preto, funde colineares e encadeia polilinhas (pareamento guloso pelo ângulo interno mais obtuso em vértices de grau ≥ 3 e fechamento `Z` em ciclos). |
-| `linhas/svg.ts` | `criarCamadaSvgHlr`, `polilinhasParaPathD` — grava dois `<path>` (construção `#343432` ~1,45 px embaixo; contorno `#171717` ~5,5 px em cima), `stroke-linejoin: miter`, `stroke-linecap: butt`, `vector-effect: non-scaling-stroke`, coordenadas a `0,1 px`, e `paraSvgString()` pronto para T5. |
+| `linhas/svg.ts` | `criarCamadaSvgHlr`, `polilinhasParaPathD` — grava dois `<path>` (construção `#A8A8A4` ~1,15 px embaixo, piso `0,45 CSS px`; contorno `#171717` ~5,5 px em cima), `stroke-linejoin: miter`, `stroke-linecap: butt`, `vector-effect: non-scaling-stroke`, coordenadas a `0,01 px`, e `paraSvgString()` pronto para T5. |
 | `linhas/index.ts` | `criarLinhasHLR(pecas, camera, svg)` → `{ atualizar(), definirDimensoes(), paraSvgString(), destruir() }`, com cache de matrizes `matrixWorld` para não recalcular quando as peças estão paradas. |
 | `cubo.ts` / `index.ts` | `criarCena(canvas, svgLinhas)` — retorna `{ renderer, scene, camera, pecas: { w, r, quarto }, linhas, renderizar, redimensionar, destruir }`. `renderizar()` executa WebGL + `linhas.atualizar()`. |
 | `debug.ts` | `iniciarModoDebug(elementos, modoDebug)` — implementa `/?debug`, `/?debug=captura` e `/?debug=hlr`. |
@@ -49,17 +49,21 @@ node tools/gauntlet/t2-rodada.mjs <n>
 - **Encontros sem z-fighting nem frestas de T-junction no topo branco (R6)**:
   - `W` recua `0.0008` em `X = +0.5`; `R` recua o corpo para `Z ≤ +0.365` + `BoxGeometry` fina ocre cobrindo a quina do W (com quad limpo em `X = +0.5` para o HLR); `fundo-esquerda` limita `Z ≤ +0.365`; `fundo-direita` limita `X ∈ [-0.365, +0.4992]`.
   - `dividirGeometriaEmPlano` subdivide `geomW` (`X = ±0.365`), `geomFE` (`Z = -0.365`) e `geomFD` (`X = +0.365`) de forma 100% manifold (topo + paredes adjacentes), eliminando as 3 frestas de T-junction que vazavam cinza/magenta sobre o aro branco (diagnosticadas em `docs/gauntlet/t2/linhas/diagnostico.md`).
-- **Pipeline de linhas vetoriais HLR em SVG (R6)**:
+- **Pipeline de linhas vetoriais HLR em SVG (R6 → refinado na R7)**:
   - Substituiu integralmente `contorno.ts` (`EdgesGeometry` → `LineSegments2`/`LineMaterial`, bias `clip.z`, `criarLinhaConstrucaoFrontalW`, `transformarArestas*`, `recortarSegmentoDireitaR`), `linhas-construcao.ts` (SVG atrás do canvas) e `polygonOffset(1, 1)` das malhas.
-  - Todas as linhas (contorno preto `5,5 px` e construção `#343432` `1,45 px`) são geradas na CPU em 2 `<path>` num único `<svg>` **sobre** o canvas, com `stroke-linejoin: miter`, `stroke-linecap: butt`, `vector-effect: non-scaling-stroke`.
+  - Todas as linhas (contorno preto `#171717` `5,5 px` e construção `#A8A8A4` `1,15 px` em 1024, sem `opacity`, piso `0,45 CSS px`) são geradas na CPU em 2 `<path>` num único `<svg>` **sobre** o canvas, com coordenadas a `0,01 px`, `stroke-linejoin: miter`, `stroke-linecap: butt`, `vector-effect: non-scaling-stroke`.
+  - Na R7, `deduplicarEFundirColineares` passou a ordenar por comprimento decrescente para ancorar cada reta suporte no maior trecho, e as linhas de construção passaram a ser emitidas diretamente como segmentos retos puros (sem `encadearEmPolilinhas`), eliminando entortamento de hastes por média de vértice e dobras `miter` entre hastes.
   - Emendas coplanares somem automaticamente **apenas quando as peças encostam** (durante a animação em `/?debug=hlr`, cada peça mantém seu contorno completo e oclui corretamente as linhas atrás dela).
-  - Desempenho medido em `/?debug=hlr` (150 quadros ativos em `1280×800`, desktop): **média `1,47 ms`**, **p95 `1,90 ms`** (meta: `≤ 4 ms` / `≤ 8 ms`), sem precisar de `three-mesh-bvh`.
+  - Desempenho medido em `/?debug=hlr` (R7, 80 quadros ativos): desktop `1280×800` dpr 1 = HLR **`2,23 ms`** média / quadro **`13,51 ms`**; mobile `390×844` dpr 3 = HLR **`1,63 ms`** média / quadro **`13,34 ms`** (meta HLR ≤ 4 ms).
+- **Alinhamento 1:1 CSS ↔ Canvas ↔ SVG e `dpr` até 3 (R7)**:
+  - `debug.ts` (`/?debug` e `/?debug=hlr`) passou a usar `overlayEl.clientWidth`/`overlayEl.clientHeight` (com `ResizeObserver` em `/?debug`) em vez de `window.innerWidth`/`window.innerHeight`, evitando distorção não-uniforme e desalinhamento WebGL/SVG causados por `html { scrollbar-gutter: stable; }`.
+  - `cubo.ts` subiu o teto de `renderer.setPixelRatio` de `2` para `3`, eliminando upscaling `1,5×` em telas `dpr = 3` sem perda de fluidez.
 - **Regra "à direita do R"**: `wrEstaADireitaDoR` (GLSL em `materiais.ts` e versão TS em `linhas/mascaras.ts`) projeta `fundo-direita` ortograficamente no plano `X = 1000` do R (`xR = X - Z`, `yR = 1000 - (Y + 0.93148*(1000 - X))`) e descarta malha e trechos de aresta que vazariam abaixo do topo à direita do bojo e da perna do R.
 - **Quina superior direita do R (R2)**: `meshRTopoContinuo` (`PlaneGeometry` em `Y = +0.5`, `castShadow = false`) fecha o aro branco reto até `T_right`/`In_right` sem editar `r.svg`, `uMascaraOmbroR`/`faceNoOmbroDescartadoR` ocultam a superfície curva saliente, e o HLR extrai automaticamente as bordas retas do topo contínuo.
 - **Furo interno ("olho") do R (R3)**: profundidade `112/1000` (`X = +0.388`) aplicada diretamente na geometria (`ajustarProfundidadeFuroR`), lida pelo HLR; peitoril `#EBEAE6` limpo e cortes diagonais preservados em `materiais.ts`.
 - **Face inferior da perna diagonal do R (R4)**: profundidade `196/1000` (`X = +0.304`) aplicada diretamente na geometria (`ajustarProfundidadePernaR`), lida pelo HLR; tom `#B3B4AE` isolado em `materiais.ts`.
 - **Batente interno direito da porta em `fundo-esquerda` (R5)**: profundidade `70/1000` (`X = -0.435`) aplicada diretamente em `geomFE` (`ajustarProfundidadePortaFE`), lida pelo HLR; cinza vertical uniforme `#CCCCC7` e soleira (`(-0.365, -0.31, -0.105) → (-0.365, -0.31, -0.165)`) preservados via `userData.hlr.arestasExtras`.
-- **Sombra dura em dois tons**: `WebGLRenderer` com `NoToneMapping` + `SRGBColorSpace` + `BasicShadowMap`. No `onBeforeCompile` de `materiais.ts`, `getShadow(...) < 0.5` ou `nWorld.y < -0.15` ou `dot(nWorld, uDirLuz) < -0.05` comuta direto para `#C6C5C1` (`fundo-esquerda` ignora auto-sombra em `nLocal.x > 0.85`).
+- **Sombra dura em dois tons com antialiasing de 1 px (R7)**: `WebGLRenderer` com `NoToneMapping` + `SRGBColorSpace` + `BasicShadowMap` (4096²). No `onBeforeCompile` de `materiais.ts`, a borda do shadow map usa superamostragem 8× em subpixel de tela (`dFdx`/`dFdy` de `vDirectionalShadowCoord[0]` no padrão MSAA 8× em `[-0.4375, +0.4375]` px) e os cortes analíticos (furo do R e vão de `fundo-direita`) usam `smoothstep` com `fwidth`, eliminando degraus binários sem borrar a sombra nem alterar os dois tons (`#EBEAE6` / `#C6C5C1`; `fundo-esquerda` continua ignorando auto-sombra em `nLocal.x > 0.85`).
 
 ## 4. Histórico de rodadas
 
@@ -70,7 +74,8 @@ node tools/gauntlet/t2-rodada.mjs <n>
 | 3 | `cb59fcb` | Falha 1: profundidade `112/1000` no furo do R, peitoril limpo, corte contínuo no teto curvo e triângulo diagonal em `fundo-direita` no vão | OK / OK / 0 err, 0 warn | `2,6222%` (27.496 px) | 8 (FAIL) |
 | 4 | `24e7b72` | Falha 1: profundidade aparente `196/1000` na face inferior da perna diagonal do R (`~14,5 px` cinza interno) e tom `#B3B4AE` isolado (`sombra_sob_r` `Δmax = 0`), sem editar `r.svg` | OK / OK / 0 err, 0 warn | `2,5846%` (27.101 px) | 7,5 (FAIL) |
 | 5 | `72702d7` | Falha 2: profundidade `70/1000` no batente direito da porta (`fundo-esquerda`), cinza vertical uniforme `#CCCCC7` sem sombra diagonal do lintel e fechamento/soleira em `y ≈ 533 px`, sem editar SVGs | OK / OK / 0 err, 0 warn | `2,5140%` (26.361 px) | 7,5 (FAIL) |
-| 6 | *(série F0–F4)* | Linhas vetoriais HLR em SVG sobre o canvas (`linhas/`), diagnóstico F0, remoção completa de `LineSegments2`/bias/`polygonOffset`/`criarLinhaConstrucaoFrontalW`, fechamento das 3 T-junctions do aro branco e modo de teste animado `/?debug=hlr` (`1,47 ms` média / `1,90 ms` p95) | OK / OK / 0 err, 0 warn | `2,5312%` (26.542 px) | *(aguardando crítico)* |
+| 6 | `2715ec5` / `02d9896` | Linhas vetoriais HLR em SVG sobre o canvas (`linhas/`), diagnóstico F0, remoção completa de `LineSegments2`/bias/`polygonOffset`/`criarLinhaConstrucaoFrontalW`, fechamento das 3 T-junctions do aro branco e modo de teste animado `/?debug=hlr` (`1,47 ms` média / `1,90 ms` p95) | OK / OK / 0 err, 0 warn | `2,5312%` (26.542 px) | 8,2 (FAIL) |
+| 7 | `60082bc` | Linhas de construção mais claras (`#A8A8A4`, `1,15 px` em 1024, piso `0,45 CSS px`) e retas puras (`0,01 px`, sem `encadearEmPolilinhas`, reta suporte pelo maior segmento); `debug.ts` 1:1 com `overlayEl.clientWidth/Height`; `pixelRatio` até `3` em `cubo.ts`; AA 8× em subpixel nas bordas de sombra e `fwidth` nos cortes analíticos em `materiais.ts` (`zoom-antes-depois.png`, `notas.md`) | OK / OK / 0 err, 0 warn | `2,4670%` (25.868 px) | *(pendente)* |
 
 ## 5. Lacunas abertas (`rodada-5/critica.md` → passagem após Rodada 6) e armadilhas a evitar
 
