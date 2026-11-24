@@ -9,7 +9,7 @@
  * Produz:
  * - `src/assets/logo/whiteroom-logo.svg` (completa, viewBox 0 0 1024 1024, contorno 5,50)
  * - `src/assets/logo/whiteroom-logo-header.svg` (sem construção, viewBox 580×580 justo, contorno 10,00 p/ 40 px)
- * - `public/favicon.svg` (versão simplificada 32×32 derivada do 3D com bordas retas pares e diagonais 2:1, placa #FAFAF8 rx 21% + borda #E4E3DF)
+ * - `public/favicon.svg` (versão simplificada 32×32 derivada do 3D com bordas retas pares e diagonais 2:1, placa #FAFAF8 rx 21% + borda #D6D5D0 2 u)
  * - `public/favicon.ico` (multi-tamanho: 16 px flat-palette dedicado + 32 px simplificado + 48 px completo na placa #FAFAF8, PNG-dentro-de-ICO)
  * - `public/apple-touch-icon.png` (180×180, fundo quadrado opaco #FAFAF8, ~12% margem, contorno 5,50)
  * - `public/icon-192.png` (192×192, purpose "any", placa arredondada #FAFAF8 rx 21% + transparente fora)
@@ -66,7 +66,8 @@ const IDX_BATENTE_PORTA = 6;
 const COR_CONTORNO = '#171717';
 const COR_CONSTRUCAO = '#A8A8A4';
 const COR_PAPEL = '#FAFAF8';
-const COR_BORDA_PLACA = '#E4E3DF';
+const COR_BORDA_PLACA = '#D6D5D0';
+const COR_PAPEL_RGB = { r: 250, g: 250, b: 248 };
 
 // Enquadramentos quadrados derivados da caixa exata do cubo (~478,8 × 545,7 sem stroke, ~552 com stroke):
 // - Header (40 px): 580 → ~2,5% respiro vertical, cubo ~38 px dentro dos 40 px
@@ -86,6 +87,10 @@ export const FAVICON_48_VIEWBOX_LADO = 658;
 export const APP_ICON_VIEWBOX_LADO = 726;
 export const MASKABLE_ICON_VIEWBOX_LADO = 740;
 export const PLACA_RAIO_FRAC = 0.21;
+export const FAVICON_SVG_BORDA_SW = 2;
+export const FAVICON_ICO_32_BORDA_SW = 1;
+export const ICON_192_BORDA_PX = 1.5;
+export const ICON_512_BORDA_PX = 3.5;
 
 // Parâmetros de vetorização em coordenadas 1024×1024:
 // - Na camada `sombra` (única com bordas sem contorno preto), o campo contínuo 8× MSAA
@@ -1066,12 +1071,11 @@ function derivarGeometriaFavicon32(geom) {
 }
 
 /**
- * Constrói `public/favicon.svg` em `viewBox="0 0 32 32"` (também usado na entrada `32×32` do `.ico`),
- * preservando exatamente a placa clara `#FAFAF8` (`rx = 21%`, borda `#E4E3DF`).
+ * Constrói `public/favicon.svg` em `viewBox="0 0 32 32"` (e a entrada `32×32` do `.ico` com `bordaSw = 1`),
+ * preservando a placa clara `#FAFAF8` (`rx = 21%`) com borda `#D6D5D0` desenhada inteiramente dentro da placa.
  */
-function montarFavicon32Svg(geom32) {
+function montarFavicon32Svg(geom32, bordaSw = FAVICON_SVG_BORDA_SW) {
 	const { lado, topoMoldura, cavidade, topo, wPoly, dRExterna, dRFuro } = geom32;
-	const bordaSw = 0.9;
 	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
 	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
 	const rectSize = Number((lado - bordaSw).toFixed(2));
@@ -1165,19 +1169,31 @@ function pontoDentroPoligono(x, y, poly) {
 	return inside;
 }
 
+function pontoDentroRectArredondado(cx, cy, x0, y0, w, h, r) {
+	if (cx < x0 || cx > x0 + w || cy < y0 || cy > y0 + h) return false;
+	const rx = Math.max(0, Math.min(r, w / 2, h / 2));
+	const ix0 = x0 + rx;
+	const ix1 = x0 + w - rx;
+	const iy0 = y0 + rx;
+	const iy1 = y0 + h - rx;
+	const dx = cx < ix0 ? ix0 - cx : cx > ix1 ? cx - ix1 : 0;
+	const dy = cy < iy0 ? iy0 - cy : cy > iy1 ? cy - iy1 : 0;
+	return dx * dx + dy * dy <= rx * rx;
+}
+
 /**
  * Rasteriza a entrada 16×16 de `public/favicon.ico` com pixels chapados da paleta exata
- * sobre a placa arredondada `#FAFAF8` (amostragem exata no centro `(x + 0,5, y + 0,5)` de cada pixel).
+ * sobre a placa arredondada `#FAFAF8` com anel de borda de 1 px opaco em `#D6D5D0`
+ * (sem antialias por dentro, respeitando os cantos arredondados).
  */
 async function rasterizarFavicon16FlatPng(grade16) {
 	const { lado, topoGrid, topoMolduraGrid, cavGrid, wGrid, rExtGrid, rFuroGrid } = grade16;
-	const bordaSw = 0.45;
 	const rxExt = Number((lado * PLACA_RAIO_FRAC).toFixed(2));
-	const rxInset = Number((rxExt - bordaSw / 2).toFixed(2));
-	const rectSize = Number((lado - bordaSw).toFixed(2));
-	const rectOff = Number((bordaSw / 2).toFixed(2));
+	const rxInt = Math.max(0, rxExt - 1);
 
-	const placaSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lado}" height="${lado}" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision"><rect x="${rectOff}" y="${rectOff}" width="${rectSize}" height="${rectSize}" rx="${rxInset}" fill="${COR_PAPEL}" stroke="${COR_BORDA_PLACA}" stroke-width="${bordaSw}"/></svg>`;
+	// Silhueta externa arredondada preenchida na cor da borda (#D6D5D0): garante AA limpo só por fora
+	// e anel de 1 px 100% opaco na borda sem sangramento interno.
+	const placaSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lado}" height="${lado}" viewBox="0 0 ${lado} ${lado}" shape-rendering="geometricPrecision"><rect x="0" y="0" width="${lado}" height="${lado}" rx="${rxExt}" fill="${COR_BORDA_PLACA}"/></svg>`;
 	const placaRaw = await sharp(Buffer.from(placaSvg)).resize(lado, lado).ensureAlpha().raw().toBuffer();
 	const rgba = Buffer.from(placaRaw);
 
@@ -1193,6 +1209,17 @@ async function rasterizarFavicon16FlatPng(grade16) {
 		rgba[o + 2] = cor.b;
 		rgba[o + 3] = 255;
 	};
+
+	// Miolo interno da placa (#FAFAF8) com inset exato de 1 px sem antialias interno
+	for (let y = 1; y < lado - 1; y++) {
+		const cy = y + 0.5;
+		for (let x = 1; x < lado - 1; x++) {
+			const cx = x + 0.5;
+			if (pontoDentroRectArredondado(cx, cy, 1, 1, lado - 2, lado - 2, rxInt)) {
+				pintar(x, y, COR_PAPEL_RGB);
+			}
+		}
+	}
 
 	for (let y = 0; y < lado; y++) {
 		const cy = y + 0.5;
@@ -1342,8 +1369,8 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 	const geomSimplificada = extrairGeometriaFaviconSimplificado(camadas);
 	const gradeFavicon16 = derivarGradeFavicon16(geomSimplificada);
 	const geomFavicon32 = derivarGeometriaFavicon32(geomSimplificada);
-	const faviconSvg = montarFavicon32Svg(geomFavicon32);
-	const svgFavicon32 = faviconSvg;
+	const faviconSvg = montarFavicon32Svg(geomFavicon32, FAVICON_SVG_BORDA_SW);
+	const svgFavicon32 = montarFavicon32Svg(geomFavicon32, FAVICON_ICO_32_BORDA_SW);
 
 	// Favicon 48 px: versão completa legível dentro da mesma placa arredondada #FAFAF8 (~8,5% respiro)
 	const svgFavicon48 = montarSvgSemConstrucao({
@@ -1367,15 +1394,24 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 		placa: { tipo: 'quadrada' },
 	});
 
-	// Ícones Android `purpose: "any"` (192 e 512 px): placa arredondada #FAFAF8 (rx 21%, borda #E4E3DF) e transparente fora
-	const svgAndroidAny = montarSvgSemConstrucao({
+	// Ícones Android `purpose: "any"` (192 e 512 px): placa arredondada #FAFAF8 (rx 21%, borda #D6D5D0) e transparente fora
+	const svgAndroidAny192 = montarSvgSemConstrucao({
 		pathsFaces,
 		dContorno,
 		cx: cubeCx,
 		cy: cubeCy,
 		lado: APP_ICON_VIEWBOX_LADO,
 		espContorno: ESPESSURA_CONTORNO,
-		placa: { tipo: 'arredondada', bordaPx: APP_ICON_VIEWBOX_LADO * 0.004 },
+		placa: { tipo: 'arredondada', bordaPx: APP_ICON_VIEWBOX_LADO * (ICON_192_BORDA_PX / 192) },
+	});
+	const svgAndroidAny512 = montarSvgSemConstrucao({
+		pathsFaces,
+		dContorno,
+		cx: cubeCx,
+		cy: cubeCy,
+		lado: APP_ICON_VIEWBOX_LADO,
+		espContorno: ESPESSURA_CONTORNO,
+		placa: { tipo: 'arredondada', bordaPx: APP_ICON_VIEWBOX_LADO * (ICON_512_BORDA_PX / 512) },
 	});
 
 	// Ícone Android `purpose: "maskable"` (512 px): fundo quadrado opaco #FAFAF8 e cubo dentro da zona segura central 80%
@@ -1394,8 +1430,8 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 		renderizarIconePng(svgFavicon32, 32, null),
 		renderizarIconePng(svgFavicon48, 48, null),
 		renderizarIconePng(svgAppleTouch, 180, COR_PAPEL),
-		renderizarIconePng(svgAndroidAny, 192, null),
-		renderizarIconePng(svgAndroidAny, 512, null),
+		renderizarIconePng(svgAndroidAny192, 192, null),
+		renderizarIconePng(svgAndroidAny512, 512, null),
 		renderizarIconePng(svgAndroidMaskable, 512, COR_PAPEL),
 	]);
 
@@ -1455,6 +1491,10 @@ async function montarTodosAtivos({ camadas, dConstrucao, dContorno, bboxContorno
 			placaRaioFrac: PLACA_RAIO_FRAC,
 			placaCor: COR_PAPEL,
 			placaBordaCor: COR_BORDA_PLACA,
+			faviconSvgBordaSw: FAVICON_SVG_BORDA_SW,
+			faviconIco32BordaSw: FAVICON_ICO_32_BORDA_SW,
+			icon192BordaPx: ICON_192_BORDA_PX,
+			icon512BordaPx: ICON_512_BORDA_PX,
 			favicon48Modo: 'completo',
 			favicon48ViewBoxSize: FAVICON_48_VIEWBOX_LADO,
 			favicon48EspContorno: ESPESSURA_CONTORNO_FAVICON_48,

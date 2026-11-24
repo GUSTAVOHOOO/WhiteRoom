@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="geometricPrecision">
-	<rect data-favicon-placa="clara" x="0.45" y="0.45" width="31.1" height="31.1" rx="6.27" fill="#FAFAF8" stroke="#E4E3DF" stroke-width="0.9"/>
+	<rect data-favicon-placa="clara" x="1" y="1" width="30" height="30" rx="5.72" fill="#FAFAF8" stroke="#D6D5D0" stroke-width="2"/>
 	<path data-logo-camada="contorno-topo" fill="#171717" d="M4 7.5L16 1.5L28 7.5L28 10L16 4L4 10Z"/>
 	<path data-logo-face="interna-simplificada" fill="#C6C5C1" d="M14 13.5L16 12.5L21 10L16 7.5L11 10L6 11L6 20L10 16L14 24Z"/>
 	<path data-logo-face="topo" fill="#FFFFFF" d="M16 4L28 10L16 16L14 15L14 13.5L16 12.5L21 10L16 7.5L11 10L6 11L4 10Z"/>
