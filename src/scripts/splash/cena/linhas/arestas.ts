@@ -1,11 +1,53 @@
 import * as THREE from 'three';
 import { LIMIAR_ARESTAS_GRAUS } from '../constantes';
 import { faceNoOmbroDescartadoR } from './mascaras';
-import type { ArestaLocal, DadosMalhaHlr, MetadadosMalhaHlr } from './tipos';
+import {
+	type ArestaLocal,
+	type DadosMalhaHlr,
+	type MetadadosMalhaHlr,
+	PAPEL_OCLUSAO_CONSTRUCAO,
+} from './tipos';
 
 const PREC_SOLDA = 1e5;
 const LIMIAR_COS_VINCO = Math.cos((LIMIAR_ARESTAS_GRAUS * Math.PI) / 180);
 const MARGEM_FRONTAL = -0.02;
+
+function classificarPapelConstrucao(
+	nomeMalha: string,
+	cx: number,
+	nx: number,
+	ny: number,
+	nz: number,
+): number {
+	// Topos brancos e peitoris (normal +Y) sempre ocluem qualquer linha de construção em 2D
+	if (ny > 0.5) return PAPEL_OCLUSAO_CONSTRUCAO.SOLIDO;
+
+	if (nomeMalha === 'malha-fundo-esquerda') {
+		// Todas as faces verticais da parede traseira esquerda (parede interna X = -0,365,
+		// batente da porta Z ≈ -0,105 e tampa traseira ao W em Z = +0,365) ficam estritamente
+		// atrás do plano Z = +0,5 da ponte `ehPonteW` (a tampa em Z = +0,365 só se projeta sob
+		// o chanfro lateral interno do W na pose final e nunca ultrapassa o plano frontal do W).
+		if (nx > 0.95 || nz > 0.95) return PAPEL_OCLUSAO_CONSTRUCAO.PAREDE_INTERNA_QUARTO;
+		return PAPEL_OCLUSAO_CONSTRUCAO.SOLIDO;
+	}
+
+	if (nomeMalha === 'malha-fundo-direita') {
+		// Parede interna do quarto (Z = -0,365, normal +Z) e ombreira interna da janela;
+		// exclui a tampa direita colada atrás do R (X ≈ +0,499).
+		if (nz > 0.95) return PAPEL_OCLUSAO_CONSTRUCAO.PAREDE_INTERNA_QUARTO;
+		if (nx > 0.95 && cx < 0.45) return PAPEL_OCLUSAO_CONSTRUCAO.PAREDE_INTERNA_QUARTO;
+		return PAPEL_OCLUSAO_CONSTRUCAO.SOLIDO;
+	}
+
+	if (nomeMalha === 'malha-w') {
+		// Face lateral interna vertical da haste esquerda do W (X ≈ -0,2775, normal +X),
+		// recuada atrás da borda frontal superior no vão aberto do W.
+		if (nx > 0.95 && cx < 0) return PAPEL_OCLUSAO_CONSTRUCAO.CHANFRO_INTERNO_W;
+		return PAPEL_OCLUSAO_CONSTRUCAO.SOLIDO;
+	}
+
+	return PAPEL_OCLUSAO_CONSTRUCAO.SOLIDO;
+}
 
 interface FaceTriangulo {
 	i0: number;
@@ -150,6 +192,7 @@ export function extrairDadosMalhaHlr(
 	const vertsLocal = new Float64Array(vertsCoords);
 	const trisIndices = new Uint32Array(facesFrontais.length * 3);
 	const trisNormais = new Float64Array(facesFrontais.length * 3);
+	const trisPapelConstrucao = new Uint8Array(facesFrontais.length);
 	for (let i = 0; i < facesFrontais.length; i++) {
 		const f = facesFrontais[i];
 		trisIndices[i * 3] = f.i0;
@@ -158,6 +201,13 @@ export function extrairDadosMalhaHlr(
 		trisNormais[i * 3] = f.nx;
 		trisNormais[i * 3 + 1] = f.ny;
 		trisNormais[i * 3 + 2] = f.nz;
+		trisPapelConstrucao[i] = classificarPapelConstrucao(
+			malha.name,
+			f.cx,
+			f.nx,
+			f.ny,
+			f.nz,
+		);
 	}
 
 	// 3. Filtrar arestas candidatas (bordas, vincos, silhuetas), descartando arestas
@@ -292,6 +342,7 @@ export function extrairDadosMalhaHlr(
 		vertsLocal,
 		trisIndices,
 		trisNormais,
+		trisPapelConstrucao,
 		arestas,
 	};
 }

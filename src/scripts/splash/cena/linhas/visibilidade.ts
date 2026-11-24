@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { gerarArestasConstrucao } from './construcao';
 import { pontoEstaADireitaDoR } from './mascaras';
-import type {
-	ArestaLocal,
-	DadosMalhaHlr,
-	EstadoAnimacaoHlr,
-	Segmento2D,
-	TipoMascaraHlr,
+import {
+	type ArestaLocal,
+	type DadosMalhaHlr,
+	type EstadoAnimacaoHlr,
+	PAPEL_OCLUSAO_CONSTRUCAO,
+	type Segmento2D,
+	type TipoMascaraHlr,
 } from './tipos';
 
 const GRADE_DIM = 32;
@@ -30,6 +31,7 @@ export function objetoVisivelNaCena(obj: THREE.Object3D): boolean {
 interface TrianguloProjetado {
 	malhaId: number;
 	mascara?: TipoMascaraHlr;
+	papelConstrucao: number;
 	x0: number;
 	y0: number;
 	z0: number;
@@ -64,6 +66,7 @@ interface ArestaProjetada {
 	malhaId: number; // -1 para construção
 	mascara?: TipoMascaraHlr;
 	ehConstrucao: boolean;
+	ehPonteW: boolean;
 	x1: number;
 	y1: number;
 	z1: number;
@@ -196,6 +199,7 @@ export class MotorVisibilidadeHlr {
 
 			const indices = dados.trisIndices;
 			const normais = dados.trisNormais;
+			const papeisConstrucao = dados.trisPapelConstrucao;
 			const numTris = indices.length / 3;
 			const temMascara = dados.mascara === 'direitaR';
 
@@ -226,6 +230,7 @@ export class MotorVisibilidadeHlr {
 				tris.push({
 					malhaId: dados.id,
 					mascara: dados.mascara,
+					papelConstrucao: papeisConstrucao[t],
 					x0,
 					y0,
 					z0,
@@ -329,6 +334,7 @@ export class MotorVisibilidadeHlr {
 					malhaId: dados.id,
 					mascara: dados.mascara,
 					ehConstrucao: false,
+					ehPonteW: false,
 					x1,
 					y1,
 					z1: ndcZ1,
@@ -411,6 +417,7 @@ export class MotorVisibilidadeHlr {
 			arestasProj.push({
 				malhaId: -1,
 				ehConstrucao: true,
+				ehPonteW: Boolean(c.ehPonteW),
 				x1,
 				y1,
 				z1: ndcZ1,
@@ -629,8 +636,46 @@ export class MotorVisibilidadeHlr {
 			return false;
 		};
 
-		// Helper: testa se o ponto projetado (mx, my, mz) está ocluído por algum triângulo frontal
-		const pontoOcluido = (mx: number, my: number, mz: number): boolean => {
+		// Verifica se a malha do W está geometricamente encaixada na reta superior frontal
+		// da ponte de construção (tolerância ~1,5 px em escala 1): somente nesse caso o chanfro
+		// lateral interno da haste esquerda do W fica atrás do vão e libera a ponte em 3D.
+		let wPonteAlinhada = false;
+		const tolAlinhamentoW = 0.004 * escalaCubo;
+		const tolAlinhamentoW2 = tolAlinhamentoW * tolAlinhamentoW;
+		for (let m = 0; m < malhas.length; m++) {
+			if (visibilidadeMalha[m] === 0) continue;
+			const dados = malhas[m];
+			if (dados.malha.name !== 'malha-w') continue;
+			const wm = dados.malha.matrixWorld.elements;
+			// Quina superior frontal interna da haste esquerda do W: (-0.2775, 0.5, 0.5)
+			const wx = wm[0] * -0.2775 + wm[4] * 0.5 + wm[8] * 0.5 + wm[12];
+			const wy = wm[1] * -0.2775 + wm[5] * 0.5 + wm[9] * 0.5 + wm[13];
+			const wz = wm[2] * -0.2775 + wm[6] * 0.5 + wm[10] * 0.5 + wm[14];
+			const lx = -0.2775 * pulsoConstrucao;
+			const ly = 0.5 * pulsoConstrucao;
+			const lz = 0.5 * pulsoConstrucao;
+			const cx = cm ? cm[0] * lx + cm[4] * ly + cm[8] * lz + cm[12] : lx;
+			const cy = cm ? cm[1] * lx + cm[5] * ly + cm[9] * lz + cm[13] : ly;
+			const cz = cm ? cm[2] * lx + cm[6] * ly + cm[10] * lz + cm[14] : lz;
+			const dx = wx - cx;
+			const dy = wy - cy;
+			const dz = wz - cz;
+			wPonteAlinhada = dx * dx + dy * dy + dz * dz <= tolAlinhamentoW2;
+			break;
+		}
+
+		// Helper: testa se o ponto projetado (mx, my, mz) está ocluído por algum triângulo frontal.
+		// Para linhas de construção, qualquer face sólida que cubra o ponto em 2D oclui a linha
+		// (independentemente da profundidade Z), exceto para a ponte sobre o vão aberto do W
+		// (`ehPonteW`) projetada sobre a parede interna do quarto (ou sobre o chanfro lateral
+		// interno do W já encaixado), onde vale o teste de profundidade 3D ortográfico.
+		const pontoOcluido = (
+			mx: number,
+			my: number,
+			mz: number,
+			ehConstrucao: boolean,
+			ehPonteW: boolean,
+		): boolean => {
 			const cx = clampCel(Math.floor((mx - cenaMinX) * invSpanX));
 			const cy = clampCel(Math.floor((my - cenaMinY) * invSpanY));
 			const lista = this.gradeTris[cy * GRADE_DIM + cx];
@@ -646,8 +691,17 @@ export class MotorVisibilidadeHlr {
 				const w2 = 1 - w0 - w1;
 				if (w2 < -1e-5) continue;
 
-				const zTri = w0 * tri.z0 + w1 * tri.z1 + w2 * tri.z2;
-				if (zTri >= mz - epsOclusaoNdc) continue;
+				const usarTesteProfundidade3D =
+					!ehConstrucao ||
+					(ehPonteW &&
+						(tri.papelConstrucao === PAPEL_OCLUSAO_CONSTRUCAO.PAREDE_INTERNA_QUARTO ||
+							(tri.papelConstrucao === PAPEL_OCLUSAO_CONSTRUCAO.CHANFRO_INTERNO_W &&
+								wPonteAlinhada)));
+
+				if (usarTesteProfundidade3D) {
+					const zTri = w0 * tri.z0 + w1 * tri.z1 + w2 * tri.z2;
+					if (zTri >= mz - epsOclusaoNdc) continue;
+				}
 
 				if (tri.mascara === 'direitaR') {
 					const lx = w0 * tri.lx0 + w1 * tri.lx1 + w2 * tri.lx2;
@@ -767,8 +821,8 @@ export class MotorVisibilidadeHlr {
 					if (ehEmenda) continue;
 				}
 
-				// 5c. Teste de oclusão ortográfica contra os triângulos frontais
-				if (pontoOcluido(mx, my, mz)) continue;
+				// 5c. Teste de oclusão contra os triângulos frontais (2D para construção, 3D para contorno/ponte no vão)
+				if (pontoOcluido(mx, my, mz, ar.ehConstrucao, ar.ehPonteW)) continue;
 
 				const seg: Segmento2D = {
 					x1: ar.x1 + dx * t0,

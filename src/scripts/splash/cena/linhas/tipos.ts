@@ -2,6 +2,24 @@ import * as THREE from 'three';
 
 export type TipoMascaraHlr = 'direitaR' | 'ombroR';
 
+/**
+ * Papel de cada triângulo frontal na oclusão de linhas de construção:
+ * - `SOLIDO` (0): face externa, topo branco ou espessura comum — oculta qualquer linha de
+ *   construção em 2D (independentemente da profundidade Z).
+ * - `PAREDE_INTERNA_QUARTO` (1): parede interna vertical do quarto vista pelo vão aberto do W
+ *   (`fundo-esquerda` X=-0,365 + batente recuado da porta, ou `fundo-direita` Z=-0,365 + ombreira
+ *   interna) — oculta linhas externas em 2D, mas para a ponte sobre o vão do W (`ehPonteW`) usa o
+ *   teste de profundidade 3D normal.
+ * - `CHANFRO_INTERNO_W` (2): face lateral interna vertical da haste esquerda do W (`malha-w`,
+ *   X ≈ -0,2775, normal +X) — oculta linhas externas em 2D; para `ehPonteW`, usa profundidade 3D
+ *   apenas quando o W está encaixado na reta da ponte (evitando travessia no overshoot/movimento).
+ */
+export const PAPEL_OCLUSAO_CONSTRUCAO = {
+	SOLIDO: 0,
+	PAREDE_INTERNA_QUARTO: 1,
+	CHANFRO_INTERNO_W: 2,
+} as const;
+
 export interface MetadadosMalhaHlr {
 	/** Geometria alternativa (ex.: curvas simplificadas ou forma completa sem recuo de quina) para o HLR. */
 	geometria?: THREE.BufferGeometry;
@@ -48,6 +66,8 @@ export interface DadosMalhaHlr {
 	trisIndices: Uint32Array;
 	/** Normais locais unitárias por triângulo frontal (length = numTris * 3). */
 	trisNormais: Float64Array;
+	/** Papel de oclusão de cada triângulo frontal contra linhas de construção. */
+	trisPapelConstrucao: Uint8Array;
 	/** Arestas candidatas em espaço local. */
 	arestas: ArestaLocal[];
 }

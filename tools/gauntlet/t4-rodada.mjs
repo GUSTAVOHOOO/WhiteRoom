@@ -31,6 +31,13 @@ const TEMPOS_DESKTOP = [
 	{ t: 3.1, arquivo: 't-3.10s-desktop.png', label: '3,10 s · Pouso no header', t0: 't-2.85s-encolhimento.png', t0Label: 'T0 · 2,85 s' },
 ];
 
+const TEMPOS_MOVIMENTO_DESKTOP = [
+	{ t: 0.55, arquivo: 't-0.55s-desktop.png', label: '0,55 s · Entrada W (início)' },
+	{ t: 1.05, arquivo: 't-1.05s-desktop.png', label: '1,05 s · Entrada R (início)' },
+	{ t: 0.66, arquivo: 't-0.66s-desktop.png', label: '0,66 s · W cruzando arestas' },
+	{ t: 1.21, arquivo: 't-1.21s-desktop.png', label: '1,21 s · R cruzando arestas' },
+];
+
 const TEMPOS_MOBILE = [
 	{ t: 1.9, arquivo: 't-1.90s-mobile.png', label: 'Mobile 390×844 dpr 3 · 1,90 s' },
 	{ t: 2.6, arquivo: 't-2.60s-mobile.png', label: 'Mobile 390×844 dpr 3 · 2,60 s' },
@@ -161,8 +168,10 @@ async function gerarFolhaContato(dirSaida) {
 
 	const larguraTotal = pad * 3 + thumbW * 2;
 	const linhasDesktopH = TEMPOS_DESKTOP.length * (headerH + thumbH + pad);
+	const numLinhasMovimento = Math.ceil(TEMPOS_MOVIMENTO_DESKTOP.length / 2);
+	const linhaMovimentoH = numLinhasMovimento * (headerH + thumbH + pad);
 	const linhaMobileH = headerH + mobileBoxH + pad;
-	const alturaTotal = tituloH + pad + linhasDesktopH + linhaMobileH + pad;
+	const alturaTotal = tituloH + pad + linhasDesktopH + linhaMovimentoH + linhaMobileH + pad;
 
 	const composites = [];
 
@@ -205,6 +214,24 @@ async function gerarFolhaContato(dirSaida) {
 			{ input: t0Buf, left: xDir, top: y + headerH },
 		);
 
+		y += headerH + thumbH + pad;
+	}
+
+	// Linhas extras: capturas desktop de peças em movimento (0,55 s, 1,05 s, 0,66 s e 1,21 s) em pares
+	for (let i = 0; i < TEMPOS_MOVIMENTO_DESKTOP.length; i += 2) {
+		for (let col = 0; col < 2 && i + col < TEMPOS_MOVIMENTO_DESKTOP.length; col++) {
+			const item = TEMPOS_MOVIMENTO_DESKTOP[i + col];
+			const movPath = path.join(dirSaida, item.arquivo);
+			const movBuf = await sharp(movPath)
+				.resize(thumbW, thumbH, { fit: 'contain', background: { r: 250, g: 250, b: 248, alpha: 1 } })
+				.png()
+				.toBuffer();
+			const x = col === 0 ? pad : pad * 2 + thumbW;
+			composites.push(
+				{ input: criarEtiquetaSvg(thumbW, headerH, `T4 · ${item.label}`, '#262624', '#FAFAF8'), left: x, top: y },
+				{ input: movBuf, left: x, top: y + headerH },
+			);
+		}
 		y += headerH + thumbH + pad;
 	}
 
@@ -325,7 +352,7 @@ try {
 			const page = await context.newPage();
 			anexarColetaConsole(page, 'captura-desktop', consoleMensagens);
 
-			for (const item of TEMPOS_DESKTOP) {
+			for (const item of [...TEMPOS_DESKTOP, ...TEMPOS_MOVIMENTO_DESKTOP]) {
 				await page.goto(`${URL_BASE}/?debug=t4&t=${item.t}`, { waitUntil: 'networkidle' });
 				await page.waitForFunction(
 					() => document.documentElement.dataset.capturaPronta === '1',

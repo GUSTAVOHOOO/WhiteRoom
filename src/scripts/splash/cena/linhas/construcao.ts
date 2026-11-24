@@ -5,6 +5,8 @@ export interface ArestaConstrucao3D {
 	bx: number;
 	by: number;
 	bz: number;
+	/** Trecho interno sobre o vão superior do W (`T_left -> T_front`), visto diante da parede interna. */
+	ehPonteW?: boolean;
 }
 
 /**
@@ -37,14 +39,17 @@ export const ARESTAS_CONSTRUCAO: readonly ArestaConstrucao3D[] = [
 	{ ax: -0.5, ay: 0.5, az: -0.5, bx: -0.5, by: 0.5 + EXT_APICE_Y, bz: -0.5 },
 	// B_front: -Y
 	{ ax: 0.5, ay: -0.5, az: 0.5, bx: 0.5, by: -0.5 - EXT_APICE_Y, bz: 0.5 },
-	// T_left: -X estendida até T_front (inclui o vão superior do W)
-	{ ax: -0.5 - EXT_PADRAO, ay: 0.5, az: 0.5, bx: 0.5, by: 0.5, bz: 0.5 },
+	// T_left: -X externa (asterisco)
+	{ ax: -0.5 - EXT_PADRAO, ay: 0.5, az: 0.5, bx: -0.5, by: 0.5, bz: 0.5 },
 	// T_right: -Z
 	{ ax: 0.5, ay: 0.5, az: -0.5, bx: 0.5, by: 0.5, bz: -0.5 - EXT_PADRAO },
 	// B_left: +Z
 	{ ax: -0.5, ay: -0.5, az: 0.5, bx: -0.5, by: -0.5, bz: 0.5 + EXT_PADRAO },
 	// B_right: +X
 	{ ax: 0.5, ay: -0.5, az: -0.5, bx: 0.5 + EXT_PADRAO, by: -0.5, bz: -0.5 },
+
+	// Ponte interna de T_left até T_front (atravessa o vão superior aberto do W)
+	{ ax: -0.5, ay: 0.5, az: 0.5, bx: 0.5, by: 0.5, bz: 0.5, ehPonteW: true },
 ];
 
 /**
@@ -73,17 +78,21 @@ export function gerarArestasConstrucao(
 		// Hexágono completo com os 6 asteriscos simétricos; ponte interna sobre o vão do W cresce com pw
 		const saida: ArestaConstrucao3D[] = [];
 		for (let i = 0; i < ARESTAS_CONSTRUCAO.length; i++) {
-			if (i === 8) {
-				saida.push({
-					ax: -0.5 - EXT_PADRAO,
-					ay: 0.5,
-					az: 0.5,
-					bx: -0.5 + pw,
-					by: 0.5,
-					bz: 0.5,
-				});
+			const ar = ARESTAS_CONSTRUCAO[i];
+			if (ar.ehPonteW) {
+				if (pw > 1e-4) {
+					saida.push({
+						ax: -0.5,
+						ay: 0.5,
+						az: 0.5,
+						bx: -0.5 + pw,
+						by: 0.5,
+						bz: 0.5,
+						ehPonteW: true,
+					});
+				}
 			} else {
-				saida.push(ARESTAS_CONSTRUCAO[i]);
+				saida.push(ar);
 			}
 		}
 		return saida;
@@ -91,7 +100,7 @@ export function gerarArestasConstrucao(
 
 	const meio = 0.5 * p;
 
-	return [
+	const arestas: ArestaConstrucao3D[] = [
 		// 1. T_back (-0.5, 0.5, -0.5) <-> T_left (-0.5, 0.5, +0.5) (eixo Z)
 		{ ax: -0.5, ay: 0.5, az: -0.5 - ext, bx: -0.5, by: 0.5, bz: -0.5 + meio },
 		{ ax: -0.5, ay: 0.5, az: 0.5 - meio, bx: -0.5, by: 0.5, bz: 0.5 + ext },
@@ -121,8 +130,8 @@ export function gerarArestasConstrucao(
 		{ ax: -0.5, ay: 0.5, az: -0.5, bx: -0.5, by: 0.5 + extApice, bz: -0.5 },
 		// B_front: -Y
 		{ ax: 0.5, ay: -0.5, az: 0.5, bx: 0.5, by: -0.5 - extApice, bz: 0.5 },
-		// T_left: -X para fora (e ponte interna +X apenas quando pw > 0)
-		{ ax: -0.5 - ext, ay: 0.5, az: 0.5, bx: -0.5 + pw, by: 0.5, bz: 0.5 },
+		// T_left: -X para fora (asterisco)
+		{ ax: -0.5 - ext, ay: 0.5, az: 0.5, bx: -0.5, by: 0.5, bz: 0.5 },
 		// T_right: -Z
 		{ ax: 0.5, ay: 0.5, az: -0.5, bx: 0.5, by: 0.5, bz: -0.5 - ext },
 		// B_left: +Z
@@ -130,4 +139,18 @@ export function gerarArestasConstrucao(
 		// B_right: +X
 		{ ax: 0.5, ay: -0.5, az: -0.5, bx: 0.5 + ext, by: -0.5, bz: -0.5 },
 	];
+
+	if (pw > 1e-4) {
+		arestas.push({
+			ax: -0.5,
+			ay: 0.5,
+			az: 0.5,
+			bx: -0.5 + pw,
+			by: 0.5,
+			bz: 0.5,
+			ehPonteW: true,
+		});
+	}
+
+	return arestas;
 }
