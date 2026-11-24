@@ -119,7 +119,15 @@ export function criarLinhasHLR(
 		const segsConstrucao = subtrairCoincidentesComContorno(segsConstrucaoBrutos, segsContorno);
 
 		const poliContorno = encadearEmPolilinhas(segsContorno);
-		const poliConstrucao = encadearEmPolilinhas(segsConstrucao);
+		// Linhas de construção já foram fundidas por reta suporte: emitir como segmentos retos
+		// puros evita soldagem/média de vértices (que entortava hastes) e junções miter entre hastes.
+		const poliConstrucao = segsConstrucao.map((s) => ({
+			pontos: [
+				{ x: s.x1, y: s.y1 },
+				{ x: s.x2, y: s.y2 },
+			],
+			fechada: false,
+		}));
 
 		const dConstrucao = polilinhasParaPathD(poliConstrucao);
 		const dContorno = polilinhasParaPathD(poliContorno);

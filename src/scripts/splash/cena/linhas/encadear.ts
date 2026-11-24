@@ -23,14 +23,19 @@ export function deduplicarEFundirColineares(
 	segmentos: readonly Segmento2D[],
 	tolDist = TOL_DIST_COLINEAR_PX,
 ): Segmento2D[] {
+	// Ordena por comprimento decrescente para que cada reta suporte seja ancorada
+	// pelo trecho mais longo (máxima precisão angular, evitando ruído de fragmentos curtos).
+	const ordenados = segmentos
+		.map((s) => ({ s, len: Math.hypot(s.x2 - s.x1, s.y2 - s.y1) }))
+		.filter((item) => item.len >= 0.05)
+		.sort((a, b) => b.len - a.len);
+
 	const retas: RetaSuporte[] = [];
 
-	for (let i = 0; i < segmentos.length; i++) {
-		const s = segmentos[i];
+	for (let i = 0; i < ordenados.length; i++) {
+		const { s, len } = ordenados[i];
 		const dx = s.x2 - s.x1;
 		const dy = s.y2 - s.y1;
-		const len = Math.hypot(dx, dy);
-		if (len < 0.05) continue;
 
 		let ux = dx / len;
 		let uy = dy / len;

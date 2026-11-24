@@ -9,11 +9,11 @@ import type { Polilinha2D } from './tipos';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 function fmtCoord(v: number): string {
-	const r = Math.round(v * 10) / 10;
+	const r = Math.round(v * 100) / 100;
 	return r === 0 ? '0' : String(r);
 }
 
-/** Converte um conjunto de polilinhas 2D em atributo `d` de `<path>` (arredondado a 0,1 px). */
+/** Converte um conjunto de polilinhas 2D em atributo `d` de `<path>` (arredondado a 0,01 px). */
 export function polilinhasParaPathD(polilinhas: readonly Polilinha2D[]): string {
 	if (polilinhas.length === 0) return '';
 	const partes: string[] = [];
@@ -68,8 +68,8 @@ export function criarCamadaSvgHlr(svg: SVGSVGElement): CamadaSvgHlr {
 	svg.appendChild(pathConstrucao);
 	svg.appendChild(pathContorno);
 
-	let ultimaLargura = REFERENCIA_PX;
-	let ultimaAltura = REFERENCIA_PX;
+	let ultimaLargura = -1;
+	let ultimaAltura = -1;
 	let ultimoDConstrucao = '';
 	let ultimoDContorno = '';
 	let ultimaEspConstrucao = ESPESSURA_LINHA_CONSTRUCAO_1024_PX;
@@ -84,7 +84,7 @@ export function criarCamadaSvgHlr(svg: SVGSVGElement): CamadaSvgHlr {
 		const w = Math.max(1, largura);
 		const h = Math.max(1, altura);
 		const escala = Math.min(w, h) / REFERENCIA_PX;
-		const espConstrucao = Math.max(0.75, ESPESSURA_LINHA_CONSTRUCAO_1024_PX * escala);
+		const espConstrucao = Math.max(0.45, ESPESSURA_LINHA_CONSTRUCAO_1024_PX * escala);
 		const espContorno = Math.max(1, ESPESSURA_CONTORNO_1024_PX * escala);
 
 		if (w !== ultimaLargura || h !== ultimaAltura) {

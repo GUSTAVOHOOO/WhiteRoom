@@ -83,11 +83,11 @@ export const CORES = {
 	sombraPernaR: '#B3B4AE',
 	batentePorta: '#CCCCC7',
 	contorno: '#171717',
-	linhaConstrucao: '#343432',
+	linhaConstrucao: '#A8A8A4',
 } as const;
 
 export const ESPESSURA_CONTORNO_1024_PX = 5.5;
-export const ESPESSURA_LINHA_CONSTRUCAO_1024_PX = 1.45;
+export const ESPESSURA_LINHA_CONSTRUCAO_1024_PX = 1.15;
 export const LIMIAR_ARESTAS_GRAUS = 25;
 export const SEGMENTOS_CURVA_R = 64;
 export const SEGMENTOS_CURVA_R_HLR = 32;

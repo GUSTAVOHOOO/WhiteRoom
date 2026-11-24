@@ -59,7 +59,7 @@ export function criarCena(canvas: HTMLCanvasElement, svgLinhas: SVGSVGElement): 
 		if (destruida) return;
 		const w = Math.max(1, Math.round(largura));
 		const h = Math.max(1, Math.round(altura));
-		const ratio = Math.min(dpr ?? (window.devicePixelRatio || 1), 2);
+		const ratio = Math.min(dpr ?? (window.devicePixelRatio || 1), 3);
 
 		renderer.setPixelRatio(ratio);
 		renderer.setSize(w, h, false);

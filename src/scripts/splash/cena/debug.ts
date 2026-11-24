@@ -177,7 +177,9 @@ function iniciarModoHlr(overlayEl: HTMLElement, cena: CenaCubo): void {
 	};
 
 	const ajustarLayout = (): void => {
-		cena.redimensionar(window.innerWidth, window.innerHeight);
+		const w = overlayEl.clientWidth || window.innerWidth;
+		const h = overlayEl.clientHeight || window.innerHeight;
+		cena.redimensionar(w, h);
 		renderizarQuadro(false);
 	};
 
@@ -418,14 +420,16 @@ export function iniciarModoDebug(
 	});
 
 	const ajustarLayout = (): void => {
-		const w = window.innerWidth;
-		const h = window.innerHeight;
+		const w = overlayEl.clientWidth || window.innerWidth;
+		const h = overlayEl.clientHeight || window.innerHeight;
 		const lado = Math.min(w, h);
 		imgRef.style.width = `${lado}px`;
 		imgRef.style.height = `${lado}px`;
 		cena.redimensionar(w, h);
 	};
 
+	const observer = new ResizeObserver(ajustarLayout);
+	observer.observe(overlayEl);
 	window.addEventListener('resize', ajustarLayout);
 	ajustarLayout();
 	aplicarEstadoVisual();

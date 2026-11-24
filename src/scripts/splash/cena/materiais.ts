@@ -214,7 +214,11 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 					float wrXmm = ( vWrLocalPos.x + 0.5 ) * 1000.0;
 					float wrYmm = ( vWrLocalPos.y + 0.5 ) * 1000.0;
 					float wrYCorte = 610.0 - 0.15 * ( 1000.0 - wrXmm );
-					float wrSombraFuro = ( wrNLocal.y < 0.72 && wrYmm > wrYCorte ) ? 1.0 : 0.0;
+					float wrDistFuro = wrYmm - wrYCorte;
+					float wrAaFuro = max( fwidth( wrDistFuro ), 0.001 );
+					float wrSombraFuro = ( wrNLocal.y < 0.72 )
+						? smoothstep( -0.5 * wrAaFuro, 0.5 * wrAaFuro, wrDistFuro )
+						: 0.0;
 					outgoingLight = mix( uCorInterna, uCorSombra, wrSombraFuro );
 				} else if (
 					uMascaraOmbroR > 0.5 &&
@@ -252,7 +256,9 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 					float wrXmm = ( vWrLocalPos.x + 0.5 ) * 1000.0;
 					float wrYmm = ( vWrLocalPos.y + 0.5 ) * 1000.0;
 					float wrYDiag = 196.0 - 0.212 * ( wrXmm - 363.0 );
-					float wrSombraVao = ( wrYmm < wrYDiag ) ? 1.0 : 0.0;
+					float wrDistVao = wrYDiag - wrYmm;
+					float wrAaVao = max( fwidth( wrDistVao ), 0.001 );
+					float wrSombraVao = smoothstep( -0.5 * wrAaVao, 0.5 * wrAaVao, wrDistVao );
 					outgoingLight = mix( uCorInterna, uCorSombra, wrSombraVao );
 				} else {
 					float wrEmSombra = 0.0;
@@ -260,16 +266,27 @@ export function criarMaterialChapado(opcoes: OpcoesMaterialChapado): THREE.MeshL
 
 					if ( !wrIgnorar ) {
 						#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-							float wrVis = receiveShadow ? getShadow(
-								directionalShadowMap[ 0 ],
-								directionalLightShadows[ 0 ].shadowMapSize,
-								directionalLightShadows[ 0 ].shadowIntensity,
-								directionalLightShadows[ 0 ].shadowBias,
-								directionalLightShadows[ 0 ].shadowRadius,
-								vDirectionalShadowCoord[ 0 ]
-							) : 1.0;
-							if ( wrVis < 0.5 ) {
-								wrEmSombra = 1.0;
+							if ( receiveShadow ) {
+								// Superamostragem 8x em subpixel de tela (padrao MSAA 8x em [-0.4375, +0.4375] px)
+								// sobre o BasicShadowMap 4096^2: mantem sombra dura em dois tons sem borrao
+								// e aplica antialiasing exato de 1 pixel fisico nas bordas diagonais da sombra.
+								vec4 wrSc = vDirectionalShadowCoord[ 0 ];
+								vec3 wrDdx = dFdx( wrSc.xyz );
+								vec3 wrDdy = dFdy( wrSc.xyz );
+								vec2 wrSmSize = directionalLightShadows[ 0 ].shadowMapSize;
+								float wrSmInt = directionalLightShadows[ 0 ].shadowIntensity;
+								float wrSmBias = directionalLightShadows[ 0 ].shadowBias;
+								float wrSmRad = directionalLightShadows[ 0 ].shadowRadius;
+								float wrSom = 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx *  0.0625 + wrDdy * -0.1875, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx * -0.0625 + wrDdy *  0.1875, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx *  0.3125 + wrDdy *  0.0625, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx * -0.1875 + wrDdy * -0.3125, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx * -0.3125 + wrDdy *  0.3125, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx * -0.4375 + wrDdy * -0.0625, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx *  0.1875 + wrDdy *  0.4375, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrSom += getShadow( directionalShadowMap[ 0 ], wrSmSize, wrSmInt, wrSmBias, wrSmRad, vec4( wrSc.xyz + wrDdx *  0.4375 + wrDdy * -0.4375, wrSc.w ) ) < 0.5 ? 1.0 : 0.0;
+								wrEmSombra = wrSom * 0.125;
 							}
 						#endif
 
