@@ -1,0 +1,171 @@
+{
+  "rodada": 1,
+  "timestamp": "2026-11-24T01:13:39.745Z",
+  "porta": 4403,
+  "astroCheck": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 10840,
+    "stdout": "\u001b[2m22:12:57\u001b[22m \u001b[34m[content]\u001b[39m Syncing content\n\u001b[33m\u001b[1m22:12:57\u001b[22m [WARN] [glob-loader]\u001b[39m No files found matching \"**/[^_]*.md\" in directory \"src\\content\\projetos\"\n\u001b[2m22:12:57\u001b[22m \u001b[34m[content]\u001b[39m Synced content\n\u001b[2m22:12:57\u001b[22m \u001b[34m[types]\u001b[39m Generated \u001b[2m699ms\u001b[22m\n\u001b[2m22:12:57\u001b[22m \u001b[34m[check]\u001b[39m Getting diagnostics for Astro files in C:\\Users\\Windows 11\\orca\\workspaces\\WhiteRoom\\splash-t4-animacao...\nResult (32 files): \n- 0 errors\n- 0 warnings\n- 0 hints",
+    "stderr": ""
+  },
+  "astroBuild": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 5500,
+    "stdout": "\u001b[2m22:13:08\u001b[22m \u001b[34m[content]\u001b[39m Syncing content\n\u001b[33m\u001b[1m22:13:08\u001b[22m [WARN] [glob-loader]\u001b[39m No files found matching \"**/[^_]*.md\" in directory \"src\\content\\projetos\"\n\u001b[2m22:13:08\u001b[22m \u001b[34m[content]\u001b[39m Synced content\n\u001b[2m22:13:08\u001b[22m \u001b[34m[types]\u001b[39m Generated \u001b[2m692ms\u001b[22m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m output: \u001b[34m\"static\"\u001b[39m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m mode: \u001b[34m\"static\"\u001b[39m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m directory: \u001b[34mC:\\Users\\Windows 11\\orca\\workspaces\\WhiteRoom\\splash-t4-animacao\\dist\\\u001b[39m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m Collecting build info...\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m \u001b[32m✓ Completed in 721ms.\u001b[39m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m Building static entrypoints...\n\u001b[2m22:13:08\u001b[22m \u001b[34m[vite]\u001b[39m \u001b[32m✓ built in 359ms\u001b[39m\n\u001b[33m\u001b[1m22:13:08\u001b[22m [WARN] [vite]\u001b[39m \u001b[33m[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[vite]\u001b[39m \u001b[32m✓ built in 358ms\u001b[39m\n\u001b[2m22:13:08\u001b[22m \u001b[34m[build]\u001b[39m Rearranging server assets...\n\n\u001b[42m\u001b[30m generating static routes \u001b[39m\u001b[49m\n\u001b[2m22:13:09\u001b[22m   \u001b[34m├─\u001b[39m \u001b[2m/prototipo-t1/index.html\u001b[22m \u001b[2m(+22ms)\u001b[22m \n\u001b[2m22:13:09\u001b[22m   \u001b[34m├─\u001b[39m \u001b[2m/index.html\u001b[22m\u001b[33m\u001b[1m22:13:09\u001b[22m [WARN] [content]\u001b[39m The collection \"projetos\" does not exist or is empty. Please check your content config file for errors.\n \u001b[2m(+17ms)\u001b[22m \n\u001b[2m22:13:09\u001b[22m \u001b[32m✓ Completed in 66ms.\n\u001b[39m\n\u001b[2m22:13:09\u001b[22m \u001b[34m[build]\u001b[39m \u001b[32m✓ Completed in 872ms.\u001b[39m\n\u001b[2m22:13:09\u001b[22m \u001b[34m[build]\u001b[39m 2 page(s) built in \u001b[1m1.60s\u001b[22m\n\u001b[2m22:13:09\u001b[22m \u001b[34m[build]\u001b[39m \u001b[1mComplete!\u001b[22m",
+    "stderr": ""
+  },
+  "captura": {
+    "ok": true,
+    "erro": null,
+    "folhaContato": "docs/gauntlet/t4/rodada-1/folha-contato.png",
+    "alinhamentoHeader": {
+      "alvoRect": {
+        "left": 144.5,
+        "top": 11.5,
+        "width": 40,
+        "height": 40
+      },
+      "logoComLinhasBBox": {
+        "width": 36.24,
+        "height": 40
+      },
+      "cuboContornoBBox": {
+        "width": 29.64,
+        "height": 33.8
+      },
+      "erroCentroPx": {
+        "dx": 0,
+        "dy": 0
+      }
+    }
+  },
+  "poseFinal": {
+    "referencia": "docs/gauntlet/t2/rodada-7/captura.png",
+    "captura": "docs/gauntlet/t4/rodada-1/pose-final-1024.png",
+    "diffImagem": "docs/gauntlet/t4/rodada-1/pose-final-diff.png",
+    "limiar": 0.1,
+    "metaPct": 0.3,
+    "totalPixels": 1048576,
+    "pixelsDiferentes": 0,
+    "porcentagem": 0,
+    "ok": true
+  },
+  "desempenho": {
+    "metaHlrMediaMs": 4,
+    "desktop1280x800": {
+      "dimensoes": {
+        "largura": 1265,
+        "altura": 800
+      },
+      "quadroDeltaMs": {
+        "quadros": 252,
+        "mediaMs": 13.434,
+        "p95Ms": 14.9,
+        "maxMs": 53.4
+      },
+      "trabalhoQuadroMs": {
+        "quadros": 253,
+        "mediaMs": 1.682,
+        "p95Ms": 4.3,
+        "maxMs": 23.3
+      },
+      "hlrMs": {
+        "quadros": 253,
+        "mediaMs": 1.108,
+        "p95Ms": 3.7,
+        "maxMs": 6.1
+      }
+    },
+    "mobile390x844Dpr3": {
+      "dimensoes": {
+        "largura": 375,
+        "altura": 844
+      },
+      "quadroDeltaMs": {
+        "quadros": 253,
+        "mediaMs": 13.293,
+        "p95Ms": 14,
+        "maxMs": 23.3
+      },
+      "trabalhoQuadroMs": {
+        "quadros": 254,
+        "mediaMs": 1.492,
+        "p95Ms": 3.5,
+        "maxMs": 10.5
+      },
+      "hlrMs": {
+        "quadros": 254,
+        "mediaMs": 0.943,
+        "p95Ms": 2.8,
+        "maxMs": 4.9
+      }
+    },
+    "hlrOk": true
+  },
+  "console": {
+    "totalErros": 0,
+    "totalAvisos": 0,
+    "erros": [],
+    "avisos": [],
+    "pageErrors": []
+  },
+  "fluxoReal": {
+    "todosOk": true,
+    "fluxoNormalEReload": {
+      "ok": true,
+      "iniciouSplash": true,
+      "exibiu3dESvg": true,
+      "duracaoTotalMs": 3433,
+      "estadoPosFim": {
+        "alvoVisivel": true,
+        "alvoDim": {
+          "width": 40,
+          "height": 40
+        },
+        "sessionFlag": "1"
+      },
+      "estadoAposReload": {
+        "splashAtiva": false,
+        "overlayPresente": false,
+        "alvoVisivel": true
+      }
+    },
+    "pularClique": {
+      "ok": true,
+      "tempoAposCliqueMs": 512,
+      "alvoVisivel": true
+    },
+    "pularEsc": {
+      "ok": true,
+      "tempoAposEscMs": 501,
+      "alvoVisivel": true
+    },
+    "movimentoReduzido": {
+      "ok": true,
+      "iniciouReduzida": true,
+      "duracaoMs": 977,
+      "alvoVisivel": true
+    },
+    "fallbackFalha": {
+      "ok": true,
+      "alvoVisivel": true
+    },
+    "regressaoDebugT2": {
+      "ok": true,
+      "painelDebugOk": true,
+      "capturaT2Ok": true
+    },
+    "determinismoEResize": {
+      "ok": true,
+      "igualContorno": true,
+      "igualConstrucao": true,
+      "cresceuEm015": true,
+      "erroCentroAposResizePx": {
+        "dx": 0,
+        "dy": 0
+      }
+    }
+  }
+}
