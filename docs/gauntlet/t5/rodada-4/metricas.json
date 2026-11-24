@@ -1,0 +1,725 @@
+{
+  "rodada": 4,
+  "timestamp": "2026-11-24T11:48:18.767Z",
+  "porta": 4403,
+  "erroGate": null,
+  "astroCheck": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 10292
+  },
+  "astroBuild": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 4865
+  },
+  "gerador": {
+    "ok": true,
+    "todosIguais": true,
+    "semGradientesFiltrosImagens": true,
+    "completoLeveOk": true,
+    "metaMaxBytes": 30720,
+    "provisoriaRemovida": true,
+    "resCapturada": 4096,
+    "headerViewBox": {
+      "x": 221.46,
+      "y": 220.17,
+      "size": 580,
+      "cubeCx": 511.4600067138672,
+      "cubeCy": 510.1650085449219,
+      "espContorno": 10
+    },
+    "faviconSpec": {
+      "faviconSvgViewBox": 32,
+      "faviconSvgModo": "grade-32-isometrica-2-1-par",
+      "favicon32ContornoTopoH": 2.5,
+      "favicon32RimH": 3.5,
+      "favicon16Modo": "grade-16-inteira-flat-palette",
+      "favicon16YOffset": 0.55,
+      "simplificado32ViewBox": 32,
+      "simplificadoMargemFrac": 0.08,
+      "placaRaioFrac": 0.21,
+      "placaCor": "#FAFAF8",
+      "placaBordaCor": "#E4E3DF",
+      "favicon48Modo": "completo",
+      "favicon48ViewBoxSize": 658,
+      "favicon48EspContorno": 9,
+      "appIconViewBoxSize": 726,
+      "maskableViewBoxSize": 740,
+      "appIconEspContorno": 5.5
+    },
+    "camadas": [
+      {
+        "nome": "interna",
+        "hex": "#EBEAE6",
+        "loops": 5,
+        "vertices": 59
+      },
+      {
+        "nome": "sombra",
+        "hex": "#C6C5C1",
+        "loops": 7,
+        "vertices": 52
+      },
+      {
+        "nome": "sombra-perna-r",
+        "hex": "#B3B4AE",
+        "loops": 1,
+        "vertices": 4
+      },
+      {
+        "nome": "batente-porta",
+        "hex": "#CCCCC7",
+        "loops": 1,
+        "vertices": 4
+      },
+      {
+        "nome": "topo",
+        "hex": "#FFFFFF",
+        "loops": 2,
+        "vertices": 33
+      },
+      {
+        "nome": "w-externa",
+        "hex": "#171717",
+        "loops": 1,
+        "vertices": 13
+      },
+      {
+        "nome": "r-externa",
+        "hex": "#CD9016",
+        "loops": 2,
+        "vertices": 49
+      }
+    ],
+    "arquivos": {
+      "whiteroom-logo.svg": {
+        "igual": true,
+        "bytes": 7732,
+        "kb": 7.55
+      },
+      "whiteroom-logo-header.svg": {
+        "igual": true,
+        "bytes": 6971,
+        "kb": 6.81
+      },
+      "favicon.svg": {
+        "igual": true,
+        "bytes": 944,
+        "kb": 0.92
+      },
+      "favicon.ico": {
+        "igual": true,
+        "bytes": 3923,
+        "kb": 3.83
+      },
+      "apple-touch-icon.png": {
+        "igual": true,
+        "bytes": 7634,
+        "kb": 7.46
+      },
+      "icon-192.png": {
+        "igual": true,
+        "bytes": 10548,
+        "kb": 10.3
+      },
+      "icon-512.png": {
+        "igual": true,
+        "bytes": 29493,
+        "kb": 28.8
+      },
+      "icon-maskable-512.png": {
+        "igual": true,
+        "bytes": 21676,
+        "kb": 21.17
+      },
+      "site.webmanifest": {
+        "igual": true,
+        "bytes": 528,
+        "kb": 0.52
+      }
+    }
+  },
+  "fidelidadeSvg1024": {
+    "referencia": "docs/gauntlet/t2/rodada-7/captura.png",
+    "captura": "docs/gauntlet/t5/rodada-4/svg-completo-1024.png",
+    "limiar": 0.1,
+    "metaPct": 0.5,
+    "largura": 1024,
+    "altura": 1024,
+    "totalPixels": 1048576,
+    "pixelsDiferentes": 0,
+    "porcentagem": 0,
+    "diffImagem": "docs/gauntlet/t5/rodada-4/svg-completo-diff.png",
+    "ok": true
+  },
+  "troca3dParaSvg": {
+    "desktop": {
+      "largura": 1280,
+      "altura": 800,
+      "totalPixels": 1024000,
+      "pixelsDiferentes": 0,
+      "porcentagem": 0,
+      "diffImagem": "docs/gauntlet/t5/rodada-4/troca-diff-desktop.png",
+      "metaPct": 0.5,
+      "estado259Ok": true,
+      "estado261Ok": true,
+      "ok": true
+    },
+    "mobile": {
+      "largura": 1170,
+      "altura": 2532,
+      "totalPixels": 2962440,
+      "pixelsDiferentes": 65,
+      "porcentagem": 0.0022,
+      "diffImagem": "docs/gauntlet/t5/rodada-4/troca-diff-mobile.png",
+      "metaPct": 0.5,
+      "estado259Ok": true,
+      "estado261Ok": true,
+      "ok": true
+    },
+    "ok": true
+  },
+  "vooEFundo": {
+    "fundoEm285": {
+      "tempo": 2.85,
+      "opacity": 0.5,
+      "ok": true
+    },
+    "alinhamentoPouso": {
+      "dx": 0.5,
+      "dy": 0.5,
+      "dw": 0,
+      "dh": 0
+    },
+    "construcaoEm260": 1,
+    "construcaoEm275": 0.5,
+    "construcaoEm290": 0,
+    "construcaoEm310": 0,
+    "fundoEm310": 0,
+    "ok": true
+  },
+  "headerRecorte4x": {
+    "cropRect": {
+      "left": 137,
+      "top": 4,
+      "width": 56,
+      "height": 56
+    },
+    "zoomFator": 4,
+    "imagem310": "docs/gauntlet/t5/rodada-4/header-3.10s-4x.png",
+    "imagemPosSplash": "docs/gauntlet/t5/rodada-4/header-pos-splash-4x.png",
+    "largura": 56,
+    "altura": 56,
+    "totalPixels": 3136,
+    "pixelsDiferentes": 1,
+    "porcentagem": 0.0319,
+    "diffImagem": null,
+    "ok": true
+  },
+  "poseFinalT4": {
+    "referencia": "docs/gauntlet/t2/rodada-7/captura.png",
+    "captura": "docs/gauntlet/t5/rodada-4/pose-final-1024.png",
+    "limiar": 0.1,
+    "metaPct": 0.3,
+    "largura": 1024,
+    "altura": 1024,
+    "totalPixels": 1048576,
+    "pixelsDiferentes": 0,
+    "porcentagem": 0,
+    "diffImagem": "docs/gauntlet/t5/rodada-4/pose-final-diff.png",
+    "ok": true
+  },
+  "evidencias": {
+    "folhaContato": "docs/gauntlet/t5/rodada-4/folha-contato.png",
+    "favicon": "docs/gauntlet/t5/rodada-4/favicon.png"
+  },
+  "desempenho": {
+    "metaHlrMediaMs": 4,
+    "desktop1280x800": {
+      "dimensoes": {
+        "largura": 1265,
+        "altura": 800
+      },
+      "quadroDeltaMs": {
+        "quadros": 245,
+        "mediaMs": 13.541,
+        "p95Ms": 14.4,
+        "maxMs": 79.6
+      },
+      "trabalhoQuadroMs": {
+        "quadros": 246,
+        "mediaMs": 1.648,
+        "p95Ms": 4.5,
+        "maxMs": 21.8
+      },
+      "hlrMs": {
+        "quadros": 181,
+        "mediaMs": 1.342,
+        "p95Ms": 3.9,
+        "maxMs": 6
+      }
+    },
+    "mobile390x844Dpr3": {
+      "dimensoes": {
+        "largura": 375,
+        "altura": 844
+      },
+      "quadroDeltaMs": {
+        "quadros": 253,
+        "mediaMs": 13.296,
+        "p95Ms": 14.2,
+        "maxMs": 21.8
+      },
+      "trabalhoQuadroMs": {
+        "quadros": 254,
+        "mediaMs": 1.211,
+        "p95Ms": 3.7,
+        "maxMs": 13.2
+      },
+      "hlrMs": {
+        "quadros": 189,
+        "mediaMs": 0.908,
+        "p95Ms": 2.8,
+        "maxMs": 5.7
+      }
+    },
+    "hlrOk": true
+  },
+  "console": {
+    "totalErros": 0,
+    "totalAvisos": 0,
+    "erros": [],
+    "avisos": [],
+    "pageErrors": []
+  },
+  "fluxoReal": {
+    "todosOk": true,
+    "fluxoNormalEReload": {
+      "ok": true,
+      "iniciouSplash": true,
+      "duracaoTotalMs": 3174,
+      "probe": {
+        "ok": true,
+        "amostrasTotais": 234,
+        "amostrasAntes3D": 4,
+        "quadrosReservaVisivelAntes3D": 0,
+        "quadrosReservaVisivelTotal": 0,
+        "quadrosSvgFinal": 38,
+        "fundoEmFadeDuranteSvg": true
+      },
+      "estadoPosFim": {
+        "alvoVisivel": true,
+        "alvoDim": {
+          "width": 40,
+          "height": 40
+        },
+        "sessionFlag": "1"
+      },
+      "estadoAposReload": {
+        "splashAtiva": false,
+        "overlayPresente": false,
+        "alvoVisivel": true
+      }
+    },
+    "headerLogoNova": {
+      "ok": true,
+      "temSvg": true,
+      "viewBox": "221.46 220.17 580 580",
+      "temFaces": true,
+      "temContorno": true,
+      "temConstrucao": false,
+      "contornoStrokeWidth": "10.00",
+      "alvoDim": {
+        "width": 40,
+        "height": 40
+      }
+    },
+    "pularMeioMontagem": {
+      "ok": true,
+      "tempoAposCliqueMs": 300,
+      "alvoVisivel": true,
+      "amostras": 23,
+      "quadrosSvgFinal": 23,
+      "svgLarguraInicialPx": 800,
+      "svgLarguraFinalPx": 70.62,
+      "canvasSumiu": true
+    },
+    "pularPosTroca": {
+      "ok": true,
+      "tempoAposCliqueMs": 307,
+      "alvoVisivel": true,
+      "amostras": 23,
+      "reexibiu3D": false
+    },
+    "pularEsc": {
+      "ok": true,
+      "tempoAposEscMs": 306,
+      "alvoVisivel": true
+    },
+    "movimentoReduzido": {
+      "ok": true,
+      "iniciouReduzida": true,
+      "duracaoMs": 976,
+      "alvoVisivel": true,
+      "quadrosVisiveis": 70,
+      "visivelDesdeInicio": true,
+      "usaWhiteroomLogoSvg": true,
+      "maxDeslocamentoPx": 0,
+      "fezFade": true
+    },
+    "fallbackFalha": {
+      "ok": true,
+      "alvoVisivel": true,
+      "quadrosVisiveis": 38,
+      "usaWhiteroomLogoSvg": true,
+      "deslocamentoPx": 594.44,
+      "diminuiuTamanho": true,
+      "aproximouDoHeader": true
+    },
+    "regressaoDebugT2": {
+      "ok": true,
+      "painelDebugOk": true,
+      "hlrDebugOk": true,
+      "capturaT2Ok": true
+    },
+    "determinismoEResize": {
+      "ok": true,
+      "igual3d": true,
+      "igualSvgTransform": true,
+      "igualFundoOpacity": true,
+      "erroCentroAposResizePx": {
+        "dx": 0,
+        "dy": 0.5
+      }
+    },
+    "estabilidadePosImpacto": {
+      "ok": true,
+      "solidoAntes": true,
+      "solidoPosContato": 0,
+      "maxErrW": 0,
+      "maxErrR": 0,
+      "maxErrRel": 0
+    },
+    "faviconEManifest": {
+      "ok": true,
+      "todos200": true,
+      "icoTamanhos": [
+        16,
+        32,
+        48
+      ],
+      "icoOk": true,
+      "semPrefersColorScheme": true,
+      "pixelAudit16": {
+        "ok": true,
+        "ico16IdenticoRodada3": true,
+        "corDominanteR": "#CD9016",
+        "corDominanteW": "#171717",
+        "pxRPuros": 25,
+        "pxWPuros": 24,
+        "pxTopoBrancos": 17,
+        "pxVaoWCol3": 5,
+        "pxVaoWCol6": 6,
+        "pxFuroR": 5
+      },
+      "pixelAuditSvg16Chromium": {
+        "ok": true,
+        "faviconSvgViewBox32": true,
+        "semContornoSobreR": true,
+        "atual16Branco": {
+          "tolerancias": {
+            "r": 24,
+            "w": 24,
+            "branco": 6
+          },
+          "pxProximosR": 17,
+          "pxProximosW": 24,
+          "pxProximosBranco": 12,
+          "pxFuroR": 4,
+          "pxVaoW": 10
+        },
+        "atual16Escuro": {
+          "tolerancias": {
+            "r": 24,
+            "w": 24,
+            "branco": 6
+          },
+          "pxProximosR": 17,
+          "pxProximosW": 24,
+          "pxProximosBranco": 12,
+          "pxFuroR": 4,
+          "pxVaoW": 10
+        },
+        "atual32Branco": {
+          "furoClaro32": 13,
+          "vaoWEsq32": 18,
+          "vaoWDir32": 16
+        },
+        "rodada3_16Branco": {
+          "tolerancias": {
+            "r": 24,
+            "w": 24,
+            "branco": 6
+          },
+          "pxProximosR": 15,
+          "pxProximosW": 18,
+          "pxProximosBranco": 2,
+          "pxFuroR": 3,
+          "pxVaoW": 11
+        },
+        "rodada2_16Branco": {
+          "tolerancias": {
+            "r": 24,
+            "w": 24,
+            "branco": 6
+          },
+          "pxProximosR": 5,
+          "pxProximosW": 18,
+          "pxProximosBranco": 0,
+          "pxFuroR": 3,
+          "pxVaoW": 2
+        },
+        "ico16Rodada3Branco": {
+          "tolerancias": {
+            "r": 24,
+            "w": 24,
+            "branco": 6
+          },
+          "pxProximosR": 25,
+          "pxProximosW": 36,
+          "pxProximosBranco": 17,
+          "pxFuroR": 3,
+          "pxVaoW": 11
+        },
+        "deltaVsRodada3": {
+          "pxProximosR": 2,
+          "pxProximosW": 6,
+          "pxProximosBranco": 10
+        }
+      },
+      "cantosOk": true,
+      "cantos": {
+        "ico16Alpha0": 0,
+        "ico32Alpha0": 0,
+        "ico48Alpha0": 0,
+        "icon192Alpha0": 0,
+        "icon512Alpha0": 0,
+        "apple180Alpha0": 255,
+        "maskable512Alpha0": 255
+      },
+      "manifestOk": true,
+      "headOk": true,
+      "headLinks": {
+        "temSvgIcon": true,
+        "temIcoIcon": true,
+        "temAppleTouch": true,
+        "temManifest": true
+      },
+      "rotas": {
+        "/favicon.svg": {
+          "statusCode": 200,
+          "bytes": 944,
+          "contentType": "image/svg+xml",
+          "ok": true
+        },
+        "/favicon.ico": {
+          "statusCode": 200,
+          "bytes": 3923,
+          "contentType": "image/x-icon",
+          "ok": true
+        },
+        "/apple-touch-icon.png": {
+          "statusCode": 200,
+          "bytes": 7634,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/icon-192.png": {
+          "statusCode": 200,
+          "bytes": 10548,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/icon-512.png": {
+          "statusCode": 200,
+          "bytes": 29493,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/icon-maskable-512.png": {
+          "statusCode": 200,
+          "bytes": 21676,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/site.webmanifest": {
+          "statusCode": 200,
+          "bytes": 528,
+          "contentType": "application/manifest+json",
+          "ok": true
+        }
+      }
+    }
+  },
+  "favicon": {
+    "ok": true,
+    "todos200": true,
+    "icoTamanhos": [
+      16,
+      32,
+      48
+    ],
+    "icoOk": true,
+    "semPrefersColorScheme": true,
+    "pixelAudit16": {
+      "ok": true,
+      "ico16IdenticoRodada3": true,
+      "corDominanteR": "#CD9016",
+      "corDominanteW": "#171717",
+      "pxRPuros": 25,
+      "pxWPuros": 24,
+      "pxTopoBrancos": 17,
+      "pxVaoWCol3": 5,
+      "pxVaoWCol6": 6,
+      "pxFuroR": 5
+    },
+    "pixelAuditSvg16Chromium": {
+      "ok": true,
+      "faviconSvgViewBox32": true,
+      "semContornoSobreR": true,
+      "atual16Branco": {
+        "tolerancias": {
+          "r": 24,
+          "w": 24,
+          "branco": 6
+        },
+        "pxProximosR": 17,
+        "pxProximosW": 24,
+        "pxProximosBranco": 12,
+        "pxFuroR": 4,
+        "pxVaoW": 10
+      },
+      "atual16Escuro": {
+        "tolerancias": {
+          "r": 24,
+          "w": 24,
+          "branco": 6
+        },
+        "pxProximosR": 17,
+        "pxProximosW": 24,
+        "pxProximosBranco": 12,
+        "pxFuroR": 4,
+        "pxVaoW": 10
+      },
+      "atual32Branco": {
+        "furoClaro32": 13,
+        "vaoWEsq32": 18,
+        "vaoWDir32": 16
+      },
+      "rodada3_16Branco": {
+        "tolerancias": {
+          "r": 24,
+          "w": 24,
+          "branco": 6
+        },
+        "pxProximosR": 15,
+        "pxProximosW": 18,
+        "pxProximosBranco": 2,
+        "pxFuroR": 3,
+        "pxVaoW": 11
+      },
+      "rodada2_16Branco": {
+        "tolerancias": {
+          "r": 24,
+          "w": 24,
+          "branco": 6
+        },
+        "pxProximosR": 5,
+        "pxProximosW": 18,
+        "pxProximosBranco": 0,
+        "pxFuroR": 3,
+        "pxVaoW": 2
+      },
+      "ico16Rodada3Branco": {
+        "tolerancias": {
+          "r": 24,
+          "w": 24,
+          "branco": 6
+        },
+        "pxProximosR": 25,
+        "pxProximosW": 36,
+        "pxProximosBranco": 17,
+        "pxFuroR": 3,
+        "pxVaoW": 11
+      },
+      "deltaVsRodada3": {
+        "pxProximosR": 2,
+        "pxProximosW": 6,
+        "pxProximosBranco": 10
+      }
+    },
+    "cantosOk": true,
+    "cantos": {
+      "ico16Alpha0": 0,
+      "ico32Alpha0": 0,
+      "ico48Alpha0": 0,
+      "icon192Alpha0": 0,
+      "icon512Alpha0": 0,
+      "apple180Alpha0": 255,
+      "maskable512Alpha0": 255
+    },
+    "manifestOk": true,
+    "headOk": true,
+    "headLinks": {
+      "temSvgIcon": true,
+      "temIcoIcon": true,
+      "temAppleTouch": true,
+      "temManifest": true
+    },
+    "rotas": {
+      "/favicon.svg": {
+        "statusCode": 200,
+        "bytes": 944,
+        "contentType": "image/svg+xml",
+        "ok": true
+      },
+      "/favicon.ico": {
+        "statusCode": 200,
+        "bytes": 3923,
+        "contentType": "image/x-icon",
+        "ok": true
+      },
+      "/apple-touch-icon.png": {
+        "statusCode": 200,
+        "bytes": 7634,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/icon-192.png": {
+        "statusCode": 200,
+        "bytes": 10548,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/icon-512.png": {
+        "statusCode": 200,
+        "bytes": 29493,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/icon-maskable-512.png": {
+        "statusCode": 200,
+        "bytes": 21676,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/site.webmanifest": {
+        "statusCode": 200,
+        "bytes": 528,
+        "contentType": "application/manifest+json",
+        "ok": true
+      }
+    }
+  }
+}
