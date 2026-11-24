@@ -419,6 +419,21 @@ export function criarPecasCubo(direcaoLuz: THREE.Vector3): ConstrucaoPecas {
 	ajustarProfundidadeFuroR(geomRCorpoHlr);
 	ajustarProfundidadePernaR(geomRCorpoHlr);
 
+	// Versão íntegra/sólida do R (Z ∈ [-0.5, +0.5], sem recuo na quina do W) para uso exclusivo
+	// enquanto a peça está em voo ou rebote separada do W. Inicia oculta para preservar a pose
+	// estática da T2 bit-a-bit idêntica.
+	const geomRSolido = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R);
+	geomRSolido.rotateY(Math.PI / 2);
+	geomRSolido.translate(0.5, 0.5, 0.5);
+	ajustarProfundidadeFuroR(geomRSolido);
+	ajustarProfundidadePernaR(geomRSolido);
+
+	const geomRSolidoHlr = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R_HLR);
+	geomRSolidoHlr.rotateY(Math.PI / 2);
+	geomRSolidoHlr.translate(0.5, 0.5, 0.5);
+	ajustarProfundidadeFuroR(geomRSolidoHlr);
+	ajustarProfundidadePernaR(geomRSolidoHlr);
+
 	// Lâmina frontal ocre cobrindo a quina Z ∈ [+0.365, +0.5] sem sobrepor o topo do W
 	const geomRLaminaQuina = new THREE.BoxGeometry(
 		INSET_QUINA * 0.75,
@@ -448,7 +463,15 @@ export function criarPecasCubo(direcaoLuz: THREE.Vector3): ConstrucaoPecas {
 		(-BORDA_INTERNA + zInicioCurvaR) / 2,
 	);
 
-	geometrias.push(geomRCorpo, geomRCorpoHlr, geomRLaminaQuina, geomRLaminaHlr, geomRTopoContinuo);
+	geometrias.push(
+		geomRCorpo,
+		geomRCorpoHlr,
+		geomRSolido,
+		geomRSolidoHlr,
+		geomRLaminaQuina,
+		geomRLaminaHlr,
+		geomRTopoContinuo,
+	);
 
 	const matR = criarMaterialChapado({
 		corExterna: CORES.rExterna,
@@ -464,6 +487,13 @@ export function criarPecasCubo(direcaoLuz: THREE.Vector3): ConstrucaoPecas {
 	meshRCorpo.receiveShadow = true;
 	definirHlr(meshRCorpo, { geometria: geomRCorpoHlr, mascara: 'ombroR' });
 
+	const meshRSolido = new THREE.Mesh(geomRSolido, matR);
+	meshRSolido.name = 'malha-r-solido';
+	meshRSolido.castShadow = true;
+	meshRSolido.receiveShadow = true;
+	meshRSolido.visible = false;
+	definirHlr(meshRSolido, { geometria: geomRSolidoHlr, mascara: 'ombroR' });
+
 	const meshRLamina = new THREE.Mesh(geomRLaminaQuina, matR);
 	meshRLamina.name = 'malha-r-quina';
 	meshRLamina.castShadow = true;
@@ -477,6 +507,7 @@ export function criarPecasCubo(direcaoLuz: THREE.Vector3): ConstrucaoPecas {
 
 	const grupoR = envolverEmPivo('peca-r', POSICOES_FINAIS.r, [
 		meshRCorpo,
+		meshRSolido,
 		meshRLamina,
 		meshRTopoContinuo,
 	]);

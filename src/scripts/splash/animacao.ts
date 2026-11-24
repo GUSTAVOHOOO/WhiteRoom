@@ -159,6 +159,12 @@ export function criarAnimacaoControlavel(
 	const cena = criarCena(canvas, svgLinhas);
 	const { camera, scene, renderer, luz, pecas, linhas } = cena;
 
+	// Malhas internas do R: `malha-r-solido` (bloco íntegro) durante voo/rebote;
+	// `malha-r-corpo` + `malha-r-quina` (recorte anti-z-fighting) apenas quando encaixado no W.
+	const meshRSolido = pecas.r.getObjectByName('malha-r-solido');
+	const meshRCorpo = pecas.r.getObjectByName('malha-r-corpo');
+	const meshRLamina = pecas.r.getObjectByName('malha-r-quina');
+
 	// Base ortonormal da câmera ortográfica fixa (nunca gira)
 	const camRight = new THREE.Vector3();
 	const camUp = new THREE.Vector3();
@@ -201,8 +207,9 @@ export function criarAnimacaoControlavel(
 		wInicio: new THREE.Vector3(),
 		wOvershoot: new THREE.Vector3(),
 		rInicio: new THREE.Vector3(),
-		// Overshoot do R para cima mantendo X >= +0,5 (a lâmina ocre não afunda dentro da coluna do W)
-		rOvershoot: new THREE.Vector3(0.008, 0.028, 0),
+		// Rebote seco do R ao longo da trajetória de entrada (quique contido para baixo-direita
+		// ao colidir no W, calculado em `recalcularLayout` a partir de `rInicio`)
+		rOvershoot: new THREE.Vector3(),
 		quartoInicioY: 2.5,
 		dockPos: new THREE.Vector3(),
 		dockEscala: 0.08,
@@ -313,7 +320,7 @@ export function criarAnimacaoControlavel(
 		);
 		pecas.w.scale.set(estado.wSx, estado.wSy, estado.wSz);
 
-		// Deslocamento do R: entrada diagonal do canto inferior direito + overshoot e rebote
+		// Deslocamento do R: entrada diagonal do canto inferior direito + rebote seco ao longo da trajetória
 		const rFalta = 1 - estado.rPosT;
 		const rOvFator = estado.rOvT - estado.rReboteT;
 		const rxOff = layout.rInicio.x * rFalta + layout.rOvershoot.x * rOvFator;
@@ -325,6 +332,17 @@ export function criarAnimacaoControlavel(
 			POSICOES_FINAIS.r.z + rzOff,
 		);
 		pecas.r.scale.set(estado.rSx, estado.rSy, estado.rSz);
+
+		// Alterna entre a malha sólida íntegra (voo/rebote) e a malha com encaixe de quina (pose encaixada no W)
+		const rDeslocMag = Math.hypot(rxOff, ryOff, rzOff);
+		const rEscalaDesvio =
+			Math.abs(estado.rSx - 1) + Math.abs(estado.rSy - 1) + Math.abs(estado.rSz - 1);
+		const usarRSolido = rDeslocMag > 1e-4 || rEscalaDesvio > 1e-4;
+		if (meshRSolido && meshRCorpo && meshRLamina) {
+			meshRSolido.visible = usarRSolido;
+			meshRCorpo.visible = !usarRSolido;
+			meshRLamina.visible = !usarRSolido;
+		}
 
 		// Queda reta do quarto branco de cima como peso
 		const qyOff = layout.quartoInicioY * (1 - estado.qPosT);
@@ -421,6 +439,20 @@ export function criarAnimacaoControlavel(
 			.addScaledVector(camUp, -(meiaAltura + 1.15));
 
 		layout.wOvershoot.copy(layout.wInicio).negate().normalize().multiplyScalar(0.045);
+
+		// Quique elástico contido (~5 px em 1280×800) ao longo da reta de entrada (+rInicio no plano da tela)
+		// após o impacto seco na quina do W: nunca ergue os pés acima da base nem expõe faces do W.
+		// Em viewports retrato muito altos, compensa ao longo de -camBack (invisível na projeção ortográfica)
+		// para garantir rz < 0 (sempre atrás da face frontal preta do W em Z = +0,5).
+		layout.rOvershoot.copy(layout.rInicio).normalize().multiplyScalar(0.0185);
+		if (layout.rOvershoot.z > -0.003) {
+			const passoBack = (layout.rOvershoot.z + 0.003) / camBack.z;
+			layout.rOvershoot.addScaledVector(camBack, -passoBack);
+		}
+		if (layout.rInicio.z > -0.25) {
+			const passoBack = (layout.rInicio.z + 0.25) / camBack.z;
+			layout.rInicio.addScaledVector(camBack, -passoBack);
+		}
 
 		// Quarto branco inicia acima do topo do frustum ao longo de +Y do mundo
 		layout.quartoInicioY = (meiaAltura + 1.05) / COSSENO_ELEVACAO;
@@ -533,7 +565,8 @@ export function criarAnimacaoControlavel(
 		0.7,
 	);
 
-	// 0,85 - 1,25 s: R entra do canto inferior direito e trava seco na quina do W
+	// 0,85 - 1,25 s: R entra do canto inferior direito, bate seco na quina do W em 1,22 s
+	// e rebota contido ao longo da trajetória de entrada (pico em 1,25 s)
 	timeline.to(
 		estado,
 		{
@@ -547,32 +580,18 @@ export function criarAnimacaoControlavel(
 		estado,
 		{
 			rOvT: 1,
-			rSx: 1.03,
-			rSy: 0.95,
-			rSz: 1,
 			duration: 0.03,
 			ease: 'power2.out',
 		},
 		1.22,
 	);
-	// Rebote mecânico do R (~160 ms)
+	// Retorno mecânico do rebote do R (~160 ms) travando firme na quina do W sem atravessá-lo
 	timeline.to(
 		estado,
 		{
 			rReboteT: 1,
 			duration: 0.16,
-			ease: 'back.out(2.8)',
-		},
-		1.25,
-	);
-	timeline.to(
-		estado,
-		{
-			rSx: 1,
-			rSy: 1,
-			rSz: 1,
-			duration: 0.16,
-			ease: 'back.out(2.4)',
+			ease: 'power3.out',
 		},
 		1.25,
 	);

@@ -35,7 +35,9 @@ const TEMPOS_MOVIMENTO_DESKTOP = [
 	{ t: 0.55, arquivo: 't-0.55s-desktop.png', label: '0,55 s · Entrada W (início)' },
 	{ t: 1.05, arquivo: 't-1.05s-desktop.png', label: '1,05 s · Entrada R (início)' },
 	{ t: 0.66, arquivo: 't-0.66s-desktop.png', label: '0,66 s · W cruzando arestas' },
+	{ t: 1.15, arquivo: 't-1.15s-desktop.png', label: '1,15 s · R em voo (entrada)' },
 	{ t: 1.21, arquivo: 't-1.21s-desktop.png', label: '1,21 s · R cruzando arestas' },
+	{ t: 1.3, arquivo: 't-1.30s-desktop.png', label: '1,30 s · R pós-impacto (rebote)' },
 ];
 
 const TEMPOS_MOBILE = [
@@ -217,7 +219,7 @@ async function gerarFolhaContato(dirSaida) {
 		y += headerH + thumbH + pad;
 	}
 
-	// Linhas extras: capturas desktop de peças em movimento (0,55 s, 1,05 s, 0,66 s e 1,21 s) em pares
+	// Linhas extras: capturas desktop de peças em movimento (0,55 / 1,05 / 0,66 / 1,15 / 1,21 / 1,30 s) em pares
 	for (let i = 0; i < TEMPOS_MOVIMENTO_DESKTOP.length; i += 2) {
 		for (let col = 0; col < 2 && i + col < TEMPOS_MOVIMENTO_DESKTOP.length; col++) {
 			const item = TEMPOS_MOVIMENTO_DESKTOP[i + col];
