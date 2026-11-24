@@ -29,3 +29,11 @@ html.splash-ativa #wr-splash {
 html.splash-ativa [data-splash-alvo] {
 	visibility: hidden;
 }
+
+#wr-splash [data-splash-logo] {
+	visibility: hidden;
+}
+
+html.splash-reduzida #wr-splash [data-splash-logo] {
+	visibility: visible;
+}

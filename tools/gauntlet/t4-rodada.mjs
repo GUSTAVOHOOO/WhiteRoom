@@ -561,11 +561,78 @@ try {
 
 		const resultados = {};
 
-		// 5a. Fluxo completo + reload na mesma aba
+		// 5a. Fluxo completo + reload na mesma aba + verificação (a): logo provisória nunca visível no modo normal
 		{
 			const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 			const page = await context.newPage();
 			anexarColetaConsole(page, 'fluxo-normal', consoleMensagens);
+
+			await page.addInitScript(() => {
+				const amostras = [];
+				let encerrado = false;
+
+				const coletar = () => {
+					if (encerrado) return;
+					const overlay = document.querySelector('[data-splash-overlay]');
+					const logo = document.querySelector('[data-splash-logo]');
+					const canvas = document.querySelector('[data-splash-canvas]');
+					const svg = document.querySelector('[data-splash-linhas]');
+					if (!overlay && amostras.length > 0) {
+						encerrado = true;
+						return;
+					}
+					if (!logo) return;
+
+					const csLogo = getComputedStyle(logo);
+					const csCanvas = canvas ? getComputedStyle(canvas) : null;
+					const csSvg = svg ? getComputedStyle(svg) : null;
+					const animacao3dIniciada = Boolean(
+						csCanvas && csCanvas.opacity === '1' && csSvg && csSvg.display !== 'none',
+					);
+					const visivel =
+						csLogo.display !== 'none' &&
+						csLogo.visibility !== 'hidden' &&
+						Number(csLogo.opacity) > 0;
+
+					amostras.push({
+						tMs: Number(performance.now().toFixed(2)),
+						visibility: csLogo.visibility,
+						opacity: Number(csLogo.opacity),
+						display: csLogo.display,
+						visivel,
+						animacao3dIniciada,
+					});
+				};
+
+				const tick = () => {
+					coletar();
+					if (!encerrado) {
+						window.requestAnimationFrame(tick);
+					}
+				};
+				window.requestAnimationFrame(tick);
+
+				window.__wrLogoProbeNormal = () => {
+					const antes3D = amostras.filter((a) => !a.animacao3dIniciada);
+					const visiveisAntes3D = antes3D.filter((a) => a.visivel);
+					const visiveisTotal = amostras.filter((a) => a.visivel);
+					const primeiro = amostras[0] ?? null;
+					return {
+						amostrasTotais: amostras.length,
+						amostrasAntes3D: antes3D.length,
+						quadrosVisiveisAntes3D: visiveisAntes3D.length,
+						quadrosVisiveisTotal: visiveisTotal.length,
+						primeiraAmostra: primeiro
+							? {
+									visibility: primeiro.visibility,
+									opacity: primeiro.opacity,
+									display: primeiro.display,
+									visivel: primeiro.visivel,
+								}
+							: null,
+					};
+				};
+			});
 
 			const t0 = Date.now();
 			await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
@@ -597,6 +664,15 @@ try {
 			);
 			const duracaoTotalMs = Date.now() - t0;
 
+			const logoNormalProbe = await page.evaluate(() => window.__wrLogoProbeNormal?.() ?? null);
+			const logoNormalOk = Boolean(
+				logoNormalProbe &&
+					logoNormalProbe.amostrasTotais >= 3 &&
+					logoNormalProbe.amostrasAntes3D >= 1 &&
+					logoNormalProbe.quadrosVisiveisAntes3D === 0 &&
+					logoNormalProbe.quadrosVisiveisTotal === 0,
+			);
+
 			const estadoPosFim = await page.evaluate(() => {
 				const alvo = document.querySelector('[data-splash-alvo]');
 				const r = alvo?.getBoundingClientRect();
@@ -623,6 +699,7 @@ try {
 				ok:
 					iniciouSplash &&
 					exibiu3dESvg &&
+					logoNormalOk &&
 					estadoPosFim.alvoVisivel &&
 					estadoPosFim.sessionFlag === '1' &&
 					!estadoAposReload.splashAtiva &&
@@ -631,6 +708,10 @@ try {
 				iniciouSplash,
 				exibiu3dESvg,
 				duracaoTotalMs,
+				logoProvisoriaNormal: {
+					ok: logoNormalOk,
+					...logoNormalProbe,
+				},
 				estadoPosFim,
 				estadoAposReload,
 			};
@@ -715,7 +796,7 @@ try {
 			await context.close();
 		}
 
-		// 5d. Movimento reduzido
+		// 5d. Movimento reduzido + verificação (c): logo aparece parada e some
 		{
 			const context = await browser.newContext({
 				viewport: { width: 1280, height: 800 },
@@ -723,6 +804,89 @@ try {
 			});
 			const page = await context.newPage();
 			anexarColetaConsole(page, 'fluxo-reduzido', consoleMensagens);
+
+			await page.addInitScript(() => {
+				const amostras = [];
+				let encerrado = false;
+
+				const coletar = () => {
+					if (encerrado) return;
+					const overlay = document.querySelector('[data-splash-overlay]');
+					const logo = document.querySelector('[data-splash-logo]');
+					if (!overlay && amostras.length > 0) {
+						encerrado = true;
+						return;
+					}
+					if (!overlay || !logo) return;
+
+					const csLogo = getComputedStyle(logo);
+					const csOverlay = getComputedStyle(overlay);
+					const rect = logo.getBoundingClientRect();
+					const logoOpacity = Number(csLogo.opacity);
+					const overlayOpacity = Number(csOverlay.opacity);
+					const visivel =
+						csLogo.display !== 'none' &&
+						csLogo.visibility === 'visible' &&
+						logoOpacity > 0 &&
+						overlayOpacity > 0;
+
+					amostras.push({
+						tMs: Number(performance.now().toFixed(2)),
+						visibility: csLogo.visibility,
+						logoOpacity,
+						overlayOpacity: Number(overlayOpacity.toFixed(3)),
+						visivel,
+						cx: Number((rect.left + rect.width / 2).toFixed(2)),
+						cy: Number((rect.top + rect.height / 2).toFixed(2)),
+						width: Number(rect.width.toFixed(2)),
+						height: Number(rect.height.toFixed(2)),
+					});
+				};
+
+				const tick = () => {
+					coletar();
+					if (!encerrado) {
+						window.requestAnimationFrame(tick);
+					}
+				};
+				window.requestAnimationFrame(tick);
+
+				window.__wrLogoProbeReduzido = () => {
+					const visiveis = amostras.filter((a) => a.visivel && a.width > 0);
+					const primeiro = visiveis[0] ?? null;
+					let maxDeslocamentoPx = 0;
+					let maxVariacaoLarguraPx = 0;
+					if (primeiro) {
+						for (const a of visiveis) {
+							const d = Math.hypot(a.cx - primeiro.cx, a.cy - primeiro.cy);
+							if (d > maxDeslocamentoPx) maxDeslocamentoPx = d;
+							const dw = Math.abs(a.width - primeiro.width);
+							if (dw > maxVariacaoLarguraPx) maxVariacaoLarguraPx = dw;
+						}
+					}
+					const opacidadesOverlay = amostras.map((a) => a.overlayOpacity);
+					const maxOverlayOpacity =
+						opacidadesOverlay.length > 0 ? Math.max(...opacidadesOverlay) : 0;
+					const minOverlayOpacity =
+						opacidadesOverlay.length > 0 ? Math.min(...opacidadesOverlay) : 1;
+					const primeiraAmostra = amostras[0] ?? null;
+
+					return {
+						amostrasTotais: amostras.length,
+						quadrosVisiveis: visiveis.length,
+						visivelDesdeInicio: Boolean(
+							primeiraAmostra &&
+								primeiraAmostra.visibility === 'visible' &&
+								primeiraAmostra.logoOpacity > 0,
+						),
+						maxDeslocamentoPx: Number(maxDeslocamentoPx.toFixed(2)),
+						maxVariacaoLarguraPx: Number(maxVariacaoLarguraPx.toFixed(2)),
+						maxOverlayOpacity,
+						minOverlayOpacity,
+						fezFade: maxOverlayOpacity >= 0.99 && minOverlayOpacity < 0.9,
+					};
+				};
+			});
 
 			const t0 = Date.now();
 			await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
@@ -737,25 +901,130 @@ try {
 				{ timeout: 3000 },
 			);
 			const duracaoMs = Date.now() - t0;
+			const logoReduzidoProbe = await page.evaluate(
+				() => window.__wrLogoProbeReduzido?.() ?? null,
+			);
 			const alvoVisivel = await page.evaluate(() => {
 				const alvo = document.querySelector('[data-splash-alvo]');
 				return alvo ? getComputedStyle(alvo).visibility === 'visible' : false;
 			});
 
+			const logoReduzidoOk = Boolean(
+				logoReduzidoProbe &&
+					logoReduzidoProbe.visivelDesdeInicio &&
+					logoReduzidoProbe.quadrosVisiveis >= 5 &&
+					logoReduzidoProbe.maxDeslocamentoPx < 1 &&
+					logoReduzidoProbe.maxVariacaoLarguraPx < 1 &&
+					logoReduzidoProbe.fezFade,
+			);
+
 			resultados.movimentoReduzido = {
-				ok: iniciouReduzida && duracaoMs >= 600 && duracaoMs < 2500 && alvoVisivel,
+				ok:
+					iniciouReduzida &&
+					duracaoMs >= 600 &&
+					duracaoMs < 2500 &&
+					alvoVisivel &&
+					logoReduzidoOk,
 				iniciouReduzida,
 				duracaoMs,
 				alvoVisivel,
+				logoProvisoriaReduzido: {
+					ok: logoReduzidoOk,
+					...logoReduzidoProbe,
+				},
 			};
 			await context.close();
 		}
 
-		// 5e. Fallback (`/?splash=falha`)
+		// 5e. Fallback (`/?splash=falha`) + verificação (b): logo aparece e voa até o header
 		{
 			const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 			const page = await context.newPage();
 			anexarColetaConsole(page, 'fluxo-fallback', consoleMensagens);
+
+			await page.addInitScript(() => {
+				const amostras = [];
+				let encerrado = false;
+
+				const coletar = () => {
+					if (encerrado) return;
+					const overlay = document.querySelector('[data-splash-overlay]');
+					const logo = document.querySelector('[data-splash-logo]');
+					const alvo = document.querySelector('[data-splash-alvo]');
+					if (!overlay && amostras.length > 0) {
+						encerrado = true;
+						return;
+					}
+					if (!overlay || !logo || !alvo) return;
+
+					const csLogo = getComputedStyle(logo);
+					const rect = logo.getBoundingClientRect();
+					const alvoRect = alvo.getBoundingClientRect();
+					const cx = rect.left + rect.width / 2;
+					const cy = rect.top + rect.height / 2;
+					const alvoCx = alvoRect.left + alvoRect.width / 2;
+					const alvoCy = alvoRect.top + alvoRect.height / 2;
+					const visivel =
+						csLogo.display !== 'none' &&
+						csLogo.visibility === 'visible' &&
+						Number(csLogo.opacity) > 0;
+
+					amostras.push({
+						tMs: Number(performance.now().toFixed(2)),
+						visibility: csLogo.visibility,
+						opacity: Number(csLogo.opacity),
+						visivel,
+						cx: Number(cx.toFixed(2)),
+						cy: Number(cy.toFixed(2)),
+						width: Number(rect.width.toFixed(2)),
+						height: Number(rect.height.toFixed(2)),
+						distAlvoPx: Number(Math.hypot(cx - alvoCx, cy - alvoCy).toFixed(2)),
+					});
+				};
+
+				const tick = () => {
+					coletar();
+					if (!encerrado) {
+						window.requestAnimationFrame(tick);
+					}
+				};
+				window.requestAnimationFrame(tick);
+
+				window.__wrLogoProbeFallback = () => {
+					const visiveis = amostras.filter((a) => a.visivel && a.width > 0);
+					const primeiro = visiveis[0] ?? null;
+					const ultimo = visiveis.length > 0 ? visiveis[visiveis.length - 1] : null;
+					const deslocamentoPx =
+						primeiro && ultimo
+							? Number(Math.hypot(ultimo.cx - primeiro.cx, ultimo.cy - primeiro.cy).toFixed(2))
+							: 0;
+					return {
+						amostrasTotais: amostras.length,
+						quadrosVisiveis: visiveis.length,
+						primeiroVisivel: primeiro
+							? {
+									cx: primeiro.cx,
+									cy: primeiro.cy,
+									width: primeiro.width,
+									distAlvoPx: primeiro.distAlvoPx,
+								}
+							: null,
+						ultimoVisivel: ultimo
+							? {
+									cx: ultimo.cx,
+									cy: ultimo.cy,
+									width: ultimo.width,
+									distAlvoPx: ultimo.distAlvoPx,
+								}
+							: null,
+						deslocamentoPx,
+						diminuiuTamanho: Boolean(primeiro && ultimo && ultimo.width < primeiro.width * 0.6),
+						aproximouDoHeader: Boolean(
+							primeiro && ultimo && ultimo.distAlvoPx < primeiro.distAlvoPx * 0.25,
+						),
+					};
+				};
+			});
 
 			await page.goto(`${URL_BASE}/?splash=falha`, { waitUntil: 'domcontentloaded' });
 			await page.waitForFunction(
@@ -765,19 +1034,34 @@ try {
 				undefined,
 				{ timeout: 3500 },
 			);
+			const logoFallbackProbe = await page.evaluate(
+				() => window.__wrLogoProbeFallback?.() ?? null,
+			);
 			const alvoVisivel = await page.evaluate(() => {
 				const alvo = document.querySelector('[data-splash-alvo]');
 				return alvo ? getComputedStyle(alvo).visibility === 'visible' : false;
 			});
 
+			const logoFallbackOk = Boolean(
+				logoFallbackProbe &&
+					logoFallbackProbe.quadrosVisiveis >= 5 &&
+					logoFallbackProbe.deslocamentoPx > 50 &&
+					logoFallbackProbe.diminuiuTamanho &&
+					logoFallbackProbe.aproximouDoHeader,
+			);
+
 			resultados.fallbackFalha = {
-				ok: alvoVisivel,
+				ok: alvoVisivel && logoFallbackOk,
 				alvoVisivel,
+				logoProvisoriaFallback: {
+					ok: logoFallbackOk,
+					...logoFallbackProbe,
+				},
 			};
 			await context.close();
 		}
 
-		// 5f. Regressão dos modos debug da T2 (`/?debug` e `/?debug=captura`)
+		// 5f. Regressão dos modos debug da T2 (`/?debug`, `/?debug=captura` e `/?debug=hlr`)
 		{
 			const context = await browser.newContext({
 				viewport: { width: 1280, height: 800 },
@@ -789,6 +1073,12 @@ try {
 			await page.goto(`${URL_BASE}/?debug`, { waitUntil: 'networkidle' });
 			const painelDebugOk = await page
 				.waitForSelector('[data-debug-painel="1"]', { timeout: 5000 })
+				.then(() => true)
+				.catch(() => false);
+
+			await page.goto(`${URL_BASE}/?debug=hlr`, { waitUntil: 'networkidle' });
+			const hlrDebugOk = await page
+				.waitForSelector('[data-hlr-hud="1"]', { timeout: 5000 })
 				.then(() => true)
 				.catch(() => false);
 
@@ -804,8 +1094,9 @@ try {
 				.catch(() => false);
 
 			resultados.regressaoDebugT2 = {
-				ok: painelDebugOk && capturaT2Ok,
+				ok: painelDebugOk && hlrDebugOk && capturaT2Ok,
 				painelDebugOk,
+				hlrDebugOk,
 				capturaT2Ok,
 			};
 			await context.close();

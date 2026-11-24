@@ -362,7 +362,7 @@ export function iniciarSplash(): void {
 			limparTimers();
 			animacao3D = instancia;
 
-			// 3D pronto a tempo: esconde a logo parada, exibe canvas + camada SVG de linhas e toca
+			// 3D pronto a tempo: mantém a logo provisória oculta, exibe canvas + camada SVG de linhas e toca
 			logoEl.style.visibility = 'hidden';
 			canvasEl.style.opacity = '1';
 			if (linhasEl) {
