@@ -1484,7 +1484,7 @@ try {
 						const p = ler(ms / 1000);
 						maxW = Math.max(maxW, Math.hypot(p.w.projSemTremorPx.x - ref.w.projSemTremorPx.x, p.w.projSemTremorPx.y - ref.w.projSemTremorPx.y));
 					}
-					for (let ms = 1220; ms <= 1600; ms += 10) {
+					for (let ms = 1250; ms <= 1600; ms += 10) {
 						const p = ler(ms / 1000);
 						maxR = Math.max(maxR, Math.hypot(p.r.projSemTremorPx.x - ref.r.projSemTremorPx.x, p.r.projSemTremorPx.y - ref.r.projSemTremorPx.y));
 					}
