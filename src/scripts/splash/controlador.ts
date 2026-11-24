@@ -79,6 +79,20 @@ export function iniciarSplash(): void {
 		return;
 	}
 
+	const paramsDebug = new URLSearchParams(window.location.search);
+	if (paramsDebug.has('debug')) {
+		const linhasEl = document.querySelector<SVGSVGElement>('[data-splash-linhas]');
+		if (!linhasEl) return;
+		const modoDebug = paramsDebug.get('debug') ?? '';
+		void import('./cena/debug').then(({ iniciarModoDebug }) => {
+			iniciarModoDebug(
+				{ overlayEl, fundoEl, logoEl, canvasEl, linhasEl },
+				modoDebug,
+			);
+		});
+		return;
+	}
+
 	const reduzida = root.classList.contains('splash-reduzida');
 	const flags = lerFlagsTeste();
 
