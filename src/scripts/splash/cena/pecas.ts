@@ -425,12 +425,16 @@ export function criarPecasCubo(direcaoLuz: THREE.Vector3): ConstrucaoPecas {
 	const geomRSolido = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R);
 	geomRSolido.rotateY(Math.PI / 2);
 	geomRSolido.translate(0.5, 0.5, 0.5);
+	// Recua 0,0008 na face Z = +0.5 (espelho do recuo do W em X) para eliminar
+	// z-fighting com a face frontal preta do W durante a aproximação final.
+	limitarEixoGeometria(geomRSolido, 'z', 'max', 0.5 - INSET_QUINA);
 	ajustarProfundidadeFuroR(geomRSolido);
 	ajustarProfundidadePernaR(geomRSolido);
 
 	const geomRSolidoHlr = extrudarPerfilBase(rSvgRaw, SEGMENTOS_CURVA_R_HLR);
 	geomRSolidoHlr.rotateY(Math.PI / 2);
 	geomRSolidoHlr.translate(0.5, 0.5, 0.5);
+	limitarEixoGeometria(geomRSolidoHlr, 'z', 'max', 0.5 - INSET_QUINA);
 	ajustarProfundidadeFuroR(geomRSolidoHlr);
 	ajustarProfundidadePernaR(geomRSolidoHlr);
 

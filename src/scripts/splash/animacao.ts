@@ -87,6 +87,7 @@ export interface TelemetriaPosePecas {
 		malhaCorpoVisivel: boolean;
 		malhaLaminaVisivel: boolean;
 	};
+	quarto: TelemetriaPecaPose;
 }
 
 export interface TelemetriaQuadroSplash {
@@ -520,21 +521,32 @@ export function criarAnimacaoControlavel(
 		layout.escalaEnquadramento = escalaEnquadramento;
 		layout.pixelsPorUnidade = pixelsPorUnidade;
 
-		// Posições iniciais fora da viewport (retrato e paisagem)
+		// Posições iniciais fora da viewport (retrato e paisagem).
+		// Mantém a mesma inclinação diagonal do desktop (razão V/H <= 0,84, ~40°) também
+		// em retrato alto, evitando que o R suba quase na vertical por baixo do W e mantendo
+		// `rInicio.z` fortemente negativo (atrás da face frontal preta do W) sem precisar
+		// aproximar o plano de entrada da face do W.
+		const deslocHBase = meiaLargura * 0.85 + 1.15;
+		const deslocVBase = meiaAltura + 1.15;
+		const razaoVhMax = 0.84;
+		const deslocVMin = meiaAltura * 0.78;
+		const deslocV = Math.min(deslocVBase, Math.max(deslocVMin, Math.min(deslocVBase, deslocHBase * razaoVhMax)));
+		const deslocH = Math.max(deslocHBase, deslocV / razaoVhMax);
+
 		layout.wInicio
 			.set(0, 0, 0)
-			.addScaledVector(camRight, -(meiaLargura * 0.85 + 1.15))
-			.addScaledVector(camUp, -(meiaAltura + 1.15));
+			.addScaledVector(camRight, -deslocH)
+			.addScaledVector(camUp, -deslocV);
 
 		layout.rInicio
 			.set(0, 0, 0)
-			.addScaledVector(camRight, meiaLargura * 0.85 + 1.15)
-			.addScaledVector(camUp, -(meiaAltura + 1.15));
+			.addScaledVector(camRight, deslocH)
+			.addScaledVector(camUp, -deslocV);
 
-		// Em viewports retrato muito altos, compensa ao longo de -camBack (invisível na projeção ortográfica)
-		// para garantir rInicio.z <= -0,25 (sempre atrás da face frontal preta do W em Z = +0,5).
-		if (layout.rInicio.z > -0.25) {
-			const passoBack = (layout.rInicio.z + 0.25) / camBack.z;
+		// Guarda defensiva para proporções retrato ainda mais extremas: mantém rInicio.z <= -0,5
+		// ao longo de -camBack (invisível na projeção ortográfica).
+		if (layout.rInicio.z > -0.5) {
+			const passoBack = (layout.rInicio.z + 0.5) / camBack.z;
 			layout.rInicio.addScaledVector(camBack, -passoBack);
 		}
 
@@ -633,37 +645,45 @@ export function criarAnimacaoControlavel(
 		0,
 	);
 
-	// 0,30 - 0,70 s: W entra do canto inferior esquerdo com desaceleração forte e para seco na pose final
+	// 0,35 - 0,70 s: W acelera do canto inferior esquerdo (`power2.in` = t³) e trava seco na pose final em 0,70 s
 	timeline.to(
 		estado,
 		{
 			wPosT: 1,
-			duration: 0.4,
-			ease: 'expo.out',
+			duration: 0.35,
+			ease: 'power2.in',
 		},
-		0.3,
+		0.35,
 	);
-	timeline.to(estado, { shakeCenaX: 1.6, shakeCenaY: 1.0, duration: 0.02, ease: 'none' }, 0.7);
-	timeline.to(estado, { shakeCenaX: -0.9, shakeCenaY: -0.6, duration: 0.025, ease: 'none' }, 0.72);
-	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 0.745);
-	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 0.7);
-	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 0.725);
+	// Tremor rígido da cena inteira (peças + linhas juntas, 2,44 px, 4 ciclos amortecidos em 125 ms,
+	// impulso inicial para cima-direita coerente com a entrada do W) + pulso nas linhas (1,027)
+	timeline.to(estado, { shakeCenaX: 2.0, shakeCenaY: 1.4, duration: 0.025, ease: 'none' }, 0.7);
+	timeline.to(estado, { shakeCenaX: -1.45, shakeCenaY: -1.0, duration: 0.025, ease: 'none' }, 0.725);
+	timeline.to(estado, { shakeCenaX: 0.85, shakeCenaY: 0.6, duration: 0.025, ease: 'none' }, 0.75);
+	timeline.to(estado, { shakeCenaX: -0.4, shakeCenaY: -0.28, duration: 0.025, ease: 'none' }, 0.775);
+	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 0.8);
+	timeline.to(estado, { pulsoLinhas: 1.027, duration: 0.025, ease: 'power2.out' }, 0.7);
+	timeline.to(estado, { pulsoLinhas: 1, duration: 0.11, ease: 'power2.out' }, 0.725);
 
-	// 0,85 - 1,22 s: R entra do canto inferior direito com desaceleração forte e para seco encaixado no W
+	// 0,90 - 1,25 s: R acelera do canto inferior direito (`power2.in` = t³) e trava seco encaixado no W em 1,25 s
 	timeline.to(
 		estado,
 		{
 			rPosT: 1,
-			duration: 0.37,
-			ease: 'expo.out',
+			duration: 0.35,
+			ease: 'power2.in',
 		},
-		0.85,
+		0.9,
 	);
-	timeline.to(estado, { shakeCenaX: -1.6, shakeCenaY: 1.0, duration: 0.02, ease: 'none' }, 1.22);
-	timeline.to(estado, { shakeCenaX: 0.9, shakeCenaY: -0.6, duration: 0.025, ease: 'none' }, 1.24);
-	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 1.265);
-	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 1.22);
-	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 1.245);
+	// Tremor rígido da cena inteira (W + R + linhas juntos, 2,44 px, 4 ciclos amortecidos em 125 ms,
+	// impulso inicial para cima-esquerda coerente com a entrada do R) + pulso nas linhas (1,027)
+	timeline.to(estado, { shakeCenaX: -2.0, shakeCenaY: 1.4, duration: 0.025, ease: 'none' }, 1.25);
+	timeline.to(estado, { shakeCenaX: 1.45, shakeCenaY: -1.0, duration: 0.025, ease: 'none' }, 1.275);
+	timeline.to(estado, { shakeCenaX: -0.85, shakeCenaY: 0.6, duration: 0.025, ease: 'none' }, 1.3);
+	timeline.to(estado, { shakeCenaX: 0.4, shakeCenaY: -0.28, duration: 0.025, ease: 'none' }, 1.325);
+	timeline.to(estado, { shakeCenaX: 0, shakeCenaY: 0, duration: 0.025, ease: 'power2.out' }, 1.35);
+	timeline.to(estado, { pulsoLinhas: 1.027, duration: 0.025, ease: 'power2.out' }, 1.25);
+	timeline.to(estado, { pulsoLinhas: 1, duration: 0.11, ease: 'power2.out' }, 1.275);
 
 	// 1,60 - 1,90 s: quarto branco cai reto de cima como peso e gera impacto com achatamento ~7%
 	timeline.to(
@@ -1027,6 +1047,7 @@ export function criarAnimacaoControlavel(
 					malhaCorpoVisivel: Boolean(meshRCorpo?.visible),
 					malhaLaminaVisivel: Boolean(meshRLamina?.visible),
 				},
+				quarto: lerPeca(pecas.quarto),
 			};
 		},
 
