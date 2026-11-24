@@ -1,16 +1,8 @@
 import gsap from 'gsap';
 import * as THREE from 'three';
 import { atualizarEnquadramentoCamera } from './cena/camera';
-import {
-	CENTRO_CUBO_X_PX,
-	CENTRO_CUBO_Y_PX,
-	COSSENO_ELEVACAO,
-	FRUSTUM_CUBO,
-	REFERENCIA_PX,
-	SENO_ELEVACAO,
-} from './cena/constantes';
+import { COSSENO_ELEVACAO, FRUSTUM_CUBO } from './cena/constantes';
 import { criarCena } from './cena/cubo';
-import { EXT_APICE_Y, EXT_PADRAO } from './cena/linhas/construcao';
 import { POSICOES_FINAIS } from './cena/pecas';
 import type {
 	AlvoHeader,
@@ -18,20 +10,18 @@ import type {
 	CriarAnimacao,
 	OpcoesAnimacaoSplash,
 } from './contrato';
+import {
+	LOGO_CONTORNO_COMPLETO_PX,
+	LOGO_HEADER_METRICAS,
+	LOGO_VIEWBOX_COMPLETO,
+} from './logo';
 
 export const DURACAO_SPLASH_S = 3.1;
+export const TEMPO_TROCA_SVG_S = 2.6;
+const DURACAO_VOO_S = 0.5;
+const DURACAO_FADE_CONSTRUCAO_S = 0.3;
 const DURACAO_PULAR_S = 0.3;
-
-// Dimensões projetadas da logo completa (cubo + hastes dos asteriscos) em unidades do cubo,
-// na câmera ortográfica fixa da T2 (azimute 45°, elevação 33,3712°).
-const LOGO_PROJ_ALTURA = COSSENO_ELEVACAO * (1 + 2 * EXT_APICE_Y) + Math.SQRT2 * SENO_ELEVACAO;
-const LOGO_PROJ_LARGURA = Math.SQRT2 * (1 + EXT_PADRAO);
-
-// Deslocamento assimétrico do frustum da T2 (ancoragem pelo topo em 1024×1024)
-const DESLOCAMENTO_FRUSTUM_X =
-	((REFERENCIA_PX / 2 - CENTRO_CUBO_X_PX) / REFERENCIA_PX) * FRUSTUM_CUBO;
-const DESLOCAMENTO_FRUSTUM_Y =
-	((CENTRO_CUBO_Y_PX - REFERENCIA_PX / 2) / REFERENCIA_PX) * FRUSTUM_CUBO;
+const DURACAO_FADE_3D_PULAR_S = 0.1;
 
 // Parâmetros base da sombra da T2 (em repouso / escala 1 → idênticos à T2)
 const LUZ_DIST_BASE = 4;
@@ -54,6 +44,10 @@ interface EstadoCoreografia {
 	shakeCenaX: number;
 	shakeCenaY: number;
 	vooT: number;
+	construcaoOpacidade: number;
+	fundoOpacidade: number;
+	contornoLarguraSvg: number;
+	opacidade3D: number;
 }
 
 interface MetricasLayout {
@@ -63,8 +57,11 @@ interface MetricasLayout {
 	wInicio: THREE.Vector3;
 	rInicio: THREE.Vector3;
 	quartoInicioY: number;
-	dockPos: THREE.Vector3;
-	dockEscala: number;
+	svgInicioTx: number;
+	svgInicioTy: number;
+	svgFimTx: number;
+	svgFimTy: number;
+	svgVooEscala: number;
 }
 
 export interface TelemetriaPecaPose {
@@ -81,6 +78,8 @@ export interface TelemetriaPosePecas {
 	tremorQuartoPx: { x: number; y: number };
 	pulsoLinhas: number;
 	linhasAcompanhamTremorCena: boolean;
+	modoSvgAtivo: boolean;
+	escalaRaiz3D: number;
 	w: TelemetriaPecaPose;
 	r: TelemetriaPecaPose & {
 		malhaSolidoVisivel: boolean;
@@ -93,6 +92,7 @@ export interface TelemetriaQuadroSplash {
 	tempo: number;
 	hlrMs: number;
 	trabalhoMs: number;
+	hlrExecutado: boolean;
 }
 
 export interface OpcoesAnimacaoControlavel extends OpcoesAnimacaoSplash {
@@ -139,6 +139,10 @@ function criarEstadoInicial(): EstadoCoreografia {
 		shakeCenaX: 0,
 		shakeCenaY: 0,
 		vooT: 0,
+		construcaoOpacidade: 1,
+		fundoOpacidade: 1,
+		contornoLarguraSvg: LOGO_CONTORNO_COMPLETO_PX,
+		opacidade3D: 1,
 	};
 }
 
@@ -152,6 +156,22 @@ function resolverSvgLinhas(
 	throw new Error('Camada SVG [data-splash-linhas] não encontrada para a splash 3D.');
 }
 
+function resolverSvgFinal(
+	container: HTMLElement,
+	opcoes?: OpcoesAnimacaoSplash,
+): HTMLElement | null {
+	if (opcoes?.svgFinal) return opcoes.svgFinal;
+	return container.querySelector<HTMLElement>('[data-splash-svg-final]');
+}
+
+function resolverFundo(
+	container: HTMLElement,
+	opcoes?: OpcoesAnimacaoSplash,
+): HTMLElement | null {
+	if (opcoes?.fundo) return opcoes.fundo;
+	return container.querySelector<HTMLElement>('[data-splash-fundo]');
+}
+
 export function criarAnimacaoControlavel(
 	canvas: HTMLCanvasElement,
 	alvo: () => AlvoHeader,
@@ -159,13 +179,19 @@ export function criarAnimacaoControlavel(
 ): AnimacaoSplashControlavel {
 	const svgLinhas = resolverSvgLinhas(canvas, opcoes);
 	const container = opcoes?.container ?? canvas.parentElement ?? document.documentElement;
+	const svgFinal = resolverSvgFinal(container, opcoes);
+	const fundo = resolverFundo(container, opcoes);
+	const svgFinalConstrucao =
+		svgFinal?.querySelector<SVGPathElement>('[data-logo-camada="construcao"]') ?? null;
+	const svgFinalContorno =
+		svgFinal?.querySelector<SVGPathElement>('[data-logo-camada="contorno"]') ?? null;
 	const dprFixo = opcoes?.dpr;
 
 	const cena = criarCena(canvas, svgLinhas);
 	const { camera, scene, renderer, luz, pecas, linhas } = cena;
 
-	// Malhas internas do R: `malha-r-solido` (bloco íntegro) durante voo/rebote;
-	// `malha-r-corpo` + `malha-r-quina` (recorte anti-z-fighting) apenas quando encaixado no W.
+	// Malhas internas do R: `malha-r-solido` (bloco íntegro) durante voo;
+	// `malha-r-corpo` + `malha-r-quina` (recorte anti-z-fighting) quando encaixado no W.
 	const meshRSolido = pecas.r.getObjectByName('malha-r-solido');
 	const meshRCorpo = pecas.r.getObjectByName('malha-r-corpo');
 	const meshRLamina = pecas.r.getObjectByName('malha-r-quina');
@@ -178,7 +204,7 @@ export function criarAnimacaoControlavel(
 	camera.matrixWorld.extractBasis(camRight, camUp, camBack);
 
 	// Hierarquia determinística mantendo as coordenadas locais das peças em [-0.5, +0.5]³:
-	// raizCubo (voo/escala até o header)
+	// raizCubo (permanece sempre em escala 1 e posição 0 — nunca encolhe 3D no header)
 	//   -> pivoShake (tremor de 2-3 px em espaço de tela)
 	//     -> pivoSquash (achatamento ancorado na base y = -0.5)
 	//       -> suportePecas (compensa +0.5 → em repouso, matrizWorld é bit-a-bit igual à T2)
@@ -212,19 +238,21 @@ export function criarAnimacaoControlavel(
 		wInicio: new THREE.Vector3(),
 		rInicio: new THREE.Vector3(),
 		quartoInicioY: 2.5,
-		dockPos: new THREE.Vector3(),
-		dockEscala: 0.08,
+		svgInicioTx: 0,
+		svgInicioTy: 0,
+		svgFimTx: 0,
+		svgFimTy: 0,
+		svgVooEscala: 0.08,
 	};
 
 	let destruida = false;
-	let forcandoVisivel = false;
 	let emPular = false;
 	let resizeRaf = 0;
 	let ultimoHlrMs = 0;
 	let ultimoTrabalhoMs = 0;
 	let promessaFim: Promise<void> | null = null;
 	let resolverFim: (() => void) | null = null;
-	let tweenPular: gsap.core.Tween | null = null;
+	let tlPular: gsap.core.Timeline | null = null;
 
 	// Cache de parâmetros do frustum de sombra para evitar updateProjectionMatrix redundante
 	let ultimoSombraFrustum = SOMBRA_FRUSTUM_BASE;
@@ -248,7 +276,7 @@ export function criarAnimacaoControlavel(
 		return promessaFim;
 	};
 
-	const atualizarSombra = (escalaCubo: number, maxDeslocPeca: number, deslocQuartoY: number): void => {
+	const atualizarSombra = (maxDeslocPeca: number, deslocQuartoY: number): void => {
 		const dir = luz.direcaoNormalizada;
 		const direcional = luz.direcional;
 		const camSombra = direcional.shadow.camera;
@@ -257,29 +285,23 @@ export function criarAnimacaoControlavel(
 		let frustum: number;
 		let near: number;
 		let far: number;
-		let normalBias: number;
 
 		if (maxDeslocPeca <= 1e-4) {
-			// Cubo montado (pausa ou voo ao header): invariante sob translação + escala uniforme;
-			// em escala = 1 e posição = 0, parâmetros são exatamente os da T2.
-			distLuz = LUZ_DIST_BASE * escalaCubo;
-			frustum = SOMBRA_FRUSTUM_BASE * escalaCubo;
-			near = SOMBRA_NEAR_BASE * escalaCubo;
-			far = SOMBRA_FAR_BASE * escalaCubo;
-			normalBias = SOMBRA_NORMAL_BIAS_BASE * escalaCubo;
+			distLuz = LUZ_DIST_BASE;
+			frustum = SOMBRA_FRUSTUM_BASE;
+			near = SOMBRA_NEAR_BASE;
+			far = SOMBRA_FAR_BASE;
 		} else {
-			// Peças em deslocamento: expande o frustum da sombra para cobrir queda e entradas sem recorte
 			distLuz = LUZ_DIST_BASE + Math.max(0, deslocQuartoY);
 			frustum = Math.min(3.6, SOMBRA_FRUSTUM_BASE + maxDeslocPeca * 0.72);
 			near = SOMBRA_NEAR_BASE;
 			far = distLuz + 5;
-			normalBias = SOMBRA_NORMAL_BIAS_BASE;
 		}
 
 		direcional.target.position.copy(raizCubo.position);
 		direcional.position.copy(raizCubo.position).addScaledVector(dir, distLuz);
 		direcional.target.updateMatrixWorld();
-		direcional.shadow.normalBias = normalBias;
+		direcional.shadow.normalBias = SOMBRA_NORMAL_BIAS_BASE;
 
 		if (
 			Math.abs(frustum - ultimoSombraFrustum) > 1e-6 ||
@@ -299,10 +321,70 @@ export function criarAnimacaoControlavel(
 		}
 	};
 
-	const aplicarEstado = (): void => {
-		const wVis = forcandoVisivel || estado.wPosT > 1e-6;
-		const rVis = forcandoVisivel || estado.rPosT > 1e-6;
-		const qVis = forcandoVisivel || estado.qPosT > 1e-6;
+	const modoSvgEstaAtivo = (): boolean =>
+		emPular || timeline.time() >= TEMPO_TROCA_SVG_S - 1e-6;
+
+	const aplicarCamadaSvgEFundo = (modoSvgAtivo: boolean): void => {
+		const opFundo = Math.max(0, Math.min(1, estado.fundoOpacidade));
+		if (fundo) {
+			fundo.style.opacity = String(Number(opFundo.toFixed(4)));
+		}
+
+		const mostrar3D = !modoSvgAtivo || (emPular && estado.opacidade3D > 1e-4);
+		if (mostrar3D) {
+			const op3d = emPular ? Math.max(0, Math.min(1, estado.opacidade3D)) : 1;
+			canvas.style.visibility = 'visible';
+			canvas.style.opacity = String(Number(op3d.toFixed(4)));
+			svgLinhas.style.display = 'block';
+			svgLinhas.style.visibility = 'visible';
+			svgLinhas.style.opacity = String(Number(op3d.toFixed(4)));
+		} else {
+			canvas.style.visibility = 'hidden';
+			canvas.style.opacity = '0';
+			svgLinhas.style.visibility = 'hidden';
+			svgLinhas.style.opacity = '0';
+		}
+
+		if (svgFinal) {
+			if (modoSvgAtivo) {
+				const voo = estado.vooT;
+				const tx = layout.svgInicioTx + (layout.svgFimTx - layout.svgInicioTx) * voo;
+				const ty = layout.svgInicioTy + (layout.svgFimTy - layout.svgInicioTy) * voo;
+				const sc = 1 + (layout.svgVooEscala - 1) * voo;
+
+				svgFinal.classList.remove('hidden');
+				svgFinal.style.display = 'block';
+				svgFinal.style.visibility = 'visible';
+				svgFinal.style.opacity = '1';
+				// Transform 2D sem `will-change` a partir de (left: 0, top: 0) para evitar
+				// arredondamento de layout em .5 px na troca 3D→SVG e borrão de textura GPU no pouso.
+				svgFinal.style.transform = `translate(${tx.toFixed(3)}px, ${ty.toFixed(3)}px) scale(${sc.toFixed(6)})`;
+
+				if (svgFinalConstrucao) {
+					const opConst = Math.max(0, Math.min(1, estado.construcaoOpacidade));
+					svgFinalConstrucao.style.opacity = String(Number(opConst.toFixed(4)));
+				}
+				if (svgFinalContorno) {
+					svgFinalContorno.setAttribute('stroke-width', estado.contornoLarguraSvg.toFixed(2));
+				}
+			} else {
+				svgFinal.style.display = 'none';
+				svgFinal.style.visibility = 'hidden';
+				svgFinal.style.transform = `translate(${layout.svgInicioTx.toFixed(3)}px, ${layout.svgInicioTy.toFixed(3)}px) scale(1)`;
+				if (svgFinalConstrucao) {
+					svgFinalConstrucao.style.opacity = '1';
+				}
+				if (svgFinalContorno) {
+					svgFinalContorno.setAttribute('stroke-width', LOGO_CONTORNO_COMPLETO_PX.toFixed(2));
+				}
+			}
+		}
+	};
+
+	const aplicarEstado3D = (): void => {
+		const wVis = estado.wPosT > 1e-6;
+		const rVis = estado.rPosT > 1e-6;
+		const qVis = estado.qPosT > 1e-6;
 
 		pecas.w.visible = wVis;
 		pecas.r.visible = rVis;
@@ -332,9 +414,7 @@ export function criarAnimacaoControlavel(
 		);
 		pecas.r.scale.set(1, 1, 1);
 
-		// Alterna entre a malha sólida íntegra (voo) e a malha com encaixe de quina (pose encaixada no W):
-		// como `rPosT` é estritamente monotônico até 1 e nunca recua após o contato, a troca ocorre uma
-		// única vez no quadro do encaixe e nunca volta para a malha sólida.
+		// Alterna entre a malha sólida íntegra (voo) e a malha com encaixe de quina (pose encaixada no W)
 		const usarRSolido = estado.rPosT < 1 - 1e-6;
 		if (meshRSolido && meshRCorpo && meshRLamina) {
 			meshRSolido.visible = usarRSolido;
@@ -354,9 +434,7 @@ export function criarAnimacaoControlavel(
 		// Achatamento no impacto do quarto ancorado na base (y = -0.5)
 		pivoSquash.scale.set(estado.sqX, estado.sqY, estado.sqZ);
 
-		// Tremor em espaço de tela (câmera permanece fixa):
-		// - `shakeCenaX/Y`: tremor curto rígido da cena inteira (peças + linhas) nos impactos de W e R
-		// - `shakeX/Y`: tremor amortecido de 2-3 px no impacto do quarto branco
+		// Tremor em espaço de tela (câmera permanece fixa)
 		const totalShakeX = estado.shakeX + estado.shakeCenaX;
 		const totalShakeY = estado.shakeY + estado.shakeCenaY;
 		const shakeMundoX = totalShakeX / layout.pixelsPorUnidade;
@@ -366,15 +444,9 @@ export function criarAnimacaoControlavel(
 			.addScaledVector(camRight, shakeMundoX)
 			.addScaledVector(camUp, shakeMundoY);
 
-		// Voo reto e encolhimento proporcional até o retângulo do header
-		const voo = estado.vooT;
-		const escalaCubo = 1 + (layout.dockEscala - 1) * voo;
-		raizCubo.position.set(
-			layout.dockPos.x * voo,
-			layout.dockPos.y * voo,
-			layout.dockPos.z * voo,
-		);
-		raizCubo.scale.set(escalaCubo, escalaCubo, escalaCubo);
+		// O 3D nunca encolhe nem voa para o header (o voo é sempre feito pela logo SVG final)
+		raizCubo.position.set(0, 0, 0);
+		raizCubo.scale.set(1, 1, 1);
 		raizCubo.updateMatrixWorld(true);
 
 		let maxDesloc = 0;
@@ -382,37 +454,49 @@ export function criarAnimacaoControlavel(
 		if (rVis) maxDesloc = Math.max(maxDesloc, Math.hypot(rxOff, ryOff, rzOff));
 		if (qVis) maxDesloc = Math.max(maxDesloc, Math.abs(qyOff));
 
-		atualizarSombra(escalaCubo, maxDesloc, qVis ? qyOff : 0);
+		atualizarSombra(maxDesloc, qVis ? qyOff : 0);
 
 		const tremorCenaAtivo =
 			Math.abs(estado.shakeCenaX) > 1e-5 || Math.abs(estado.shakeCenaY) > 1e-5;
-		const matrizConstrucao =
-			voo > 1e-6 ? raizCubo.matrixWorld : tremorCenaAtivo ? pivoShake.matrixWorld : null;
+		const matrizConstrucao = tremorCenaAtivo ? pivoShake.matrixWorld : null;
 		linhas.definirEstadoAnimacao({
 			progressoConstrucao: estado.progressoConstrucao,
 			progressoPonteW: estado.wPosT,
 			pulsoConstrucao: estado.pulsoLinhas,
 			matrizConstrucao,
-			escalaCubo,
+			escalaCubo: 1,
 		});
 	};
 
 	const renderizarQuadro = (notificar = true): void => {
 		if (destruida) return;
 		const tIni = performance.now();
-		aplicarEstado();
-		renderer.render(scene, camera);
-		const tHlr = performance.now();
-		linhas.atualizar();
-		const tFim = performance.now();
-		ultimoHlrMs = tFim - tHlr;
-		ultimoTrabalhoMs = tFim - tIni;
+		const modoSvgAtivo = modoSvgEstaAtivo();
+		let hlrExecutado = false;
+
+		if (!modoSvgAtivo) {
+			aplicarEstado3D();
+			aplicarCamadaSvgEFundo(false);
+			renderer.render(scene, camera);
+			const tHlr = performance.now();
+			linhas.atualizar();
+			const tFim = performance.now();
+			ultimoHlrMs = tFim - tHlr;
+			ultimoTrabalhoMs = tFim - tIni;
+			hlrExecutado = true;
+		} else {
+			aplicarCamadaSvgEFundo(true);
+			const tFim = performance.now();
+			ultimoHlrMs = 0;
+			ultimoTrabalhoMs = tFim - tIni;
+		}
 
 		if (notificar && opcoes?.onQuadro) {
 			opcoes.onQuadro({
 				tempo: timeline.time(),
 				hlrMs: ultimoHlrMs,
 				trabalhoMs: ultimoTrabalhoMs,
+				hlrExecutado,
 			});
 		}
 	};
@@ -420,7 +504,7 @@ export function criarAnimacaoControlavel(
 	const recalcularLayout = (): void => {
 		if (destruida) return;
 
-		// Dimensiona canvas e SVG pelo tamanho real do container (nunca por window.innerWidth)
+		// Dimensiona canvas, HLR e SVG final pelo tamanho real do container (nunca por window.innerWidth)
 		const w = Math.max(1, container.clientWidth || window.innerWidth);
 		const h = Math.max(1, container.clientHeight || window.innerHeight);
 		const lado = Math.min(w, h);
@@ -453,34 +537,54 @@ export function criarAnimacaoControlavel(
 		// Quarto branco inicia acima do topo do frustum ao longo de +Y do mundo
 		layout.quartoInicioY = (meiaAltura + 1.05) / COSSENO_ELEVACAO;
 
-		// Mira o retângulo atual do header em coordenadas locais do overlay
+		// Enquadramento exato 1:1 da logo SVG final sobre o quadrado 1024×1024 da câmera ortográfica.
+		// Mantém left/top em 0 e aplica o deslocamento inicial no `transform` para precisão subpixel
+		// real (evita snap de 0,5 px do layout em larguras ímpares como 1265 px / 375 px).
+		const ratio = Math.min(dprFixo ?? (window.devicePixelRatio || 1), 3);
+		const snapDevicePx = (v: number): number => Math.round(v * ratio) / ratio;
+
+		const svgLeft = (w - lado) / 2;
+		const svgTop = (h - lado) / 2;
+		const originFracX = LOGO_HEADER_METRICAS.cx / LOGO_VIEWBOX_COMPLETO;
+		const originFracY = LOGO_HEADER_METRICAS.cy / LOGO_VIEWBOX_COMPLETO;
+		const ox = originFracX * lado;
+		const oy = originFracY * lado;
+
+		layout.svgInicioTx = svgLeft;
+		layout.svgInicioTy = svgTop;
+
+		if (svgFinal) {
+			svgFinal.style.left = '0px';
+			svgFinal.style.top = '0px';
+			svgFinal.style.width = `${lado}px`;
+			svgFinal.style.height = `${lado}px`;
+			svgFinal.style.transformOrigin = `${(originFracX * 100).toFixed(4)}% ${(originFracY * 100).toFixed(4)}%`;
+		}
+
+		// Mira o retângulo pintado do header (`[data-splash-alvo]` com `whiteroom-logo-header.svg`),
+		// acompanhando o snap de dispositivo do layout para que a troca final em 3,10 s seja invisível.
 		const overlayRect = container.getBoundingClientRect();
 		const alvoRect = alvo().rect;
 		if (alvoRect.width > 0 && alvoRect.height > 0) {
-			const alvoCx = alvoRect.left - overlayRect.left + alvoRect.width / 2;
-			const alvoCy = alvoRect.top - overlayRect.top + alvoRect.height / 2;
-			const origemCx = w / 2 - DESLOCAMENTO_FRUSTUM_X * pixelsPorUnidade;
-			const origemCy = h / 2 + DESLOCAMENTO_FRUSTUM_Y * pixelsPorUnidade;
+			const alvoLeft = snapDevicePx(alvoRect.left - overlayRect.left);
+			const alvoTop = snapDevicePx(alvoRect.top - overlayRect.top);
+			const alvoWidth = snapDevicePx(alvoRect.width);
+			const alvoHeight = snapDevicePx(alvoRect.height);
+			const alvoCx = alvoLeft + alvoWidth / 2;
+			const alvoCy = alvoTop + alvoHeight / 2;
+			const alvoLado = Math.min(alvoWidth, alvoHeight);
 
-			const dxPx = alvoCx - origemCx;
-			const dyPx = -(alvoCy - origemCy);
-
-			layout.dockPos
-				.set(0, 0, 0)
-				.addScaledVector(camRight, dxPx / pixelsPorUnidade)
-				.addScaledVector(camUp, dyPx / pixelsPorUnidade);
-
-			layout.dockEscala = Math.min(
-				alvoRect.height / (LOGO_PROJ_ALTURA * pixelsPorUnidade),
-				alvoRect.width / (LOGO_PROJ_LARGURA * pixelsPorUnidade),
-			);
+			layout.svgFimTx = alvoCx - ox;
+			layout.svgFimTy = alvoCy - oy;
+			layout.svgVooEscala =
+				(alvoLado * LOGO_VIEWBOX_COMPLETO) / (lado * LOGO_HEADER_METRICAS.lado);
 		} else {
-			layout.dockPos.set(0, 0, 0);
-			layout.dockEscala = 0.08;
+			layout.svgFimTx = svgLeft;
+			layout.svgFimTy = svgTop;
+			layout.svgVooEscala = 0.08;
 		}
 
-		// Atualiza renderer, câmera e dimensões SVG e renderiza uma única vez já na pose atual
-		const ratio = Math.min(dprFixo ?? (window.devicePixelRatio || 1), 3);
+		// Atualiza renderer, câmera e dimensões SVG e renderiza na pose atual
 		renderer.setPixelRatio(ratio);
 		renderer.setSize(w, h, false);
 		atualizarEnquadramentoCamera(camera, w, h);
@@ -488,7 +592,7 @@ export function criarAnimacaoControlavel(
 		renderizarQuadro(false);
 	};
 
-	// --- Timeline GSAP determinística (todo movimento e estado no relógio da timeline) ---
+	// --- Timeline GSAP determinística (0..2,60 s intactos; 2,60..3,10 s voo SVG + fades) ---
 	const timeline = gsap.timeline({
 		paused: true,
 		repeat: opcoes?.loop ? -1 : 0,
@@ -518,8 +622,6 @@ export function criarAnimacaoControlavel(
 	);
 
 	// 0,30 - 0,70 s: W entra do canto inferior esquerdo com desaceleração forte e para seco na pose final
-	// (sem overshoot, sem rebote e sem escala não uniforme). Impacto sentido por tremor rígido da cena (70 ms)
-	// e pulso sutil nas linhas de construção.
 	timeline.to(
 		estado,
 		{
@@ -536,8 +638,6 @@ export function criarAnimacaoControlavel(
 	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 0.725);
 
 	// 0,85 - 1,22 s: R entra do canto inferior direito com desaceleração forte e para seco encaixado no W
-	// (troca de malha única em 1,22 s, sem rebote e sem reabrir fresta). Impacto sentido por tremor rígido
-	// da cena inteira (peças W+R e linhas juntas por 70 ms) e pulso sutil nas linhas.
 	timeline.to(
 		estado,
 		{
@@ -553,8 +653,7 @@ export function criarAnimacaoControlavel(
 	timeline.to(estado, { pulsoLinhas: 1.018, duration: 0.025, ease: 'power2.out' }, 1.22);
 	timeline.to(estado, { pulsoLinhas: 1, duration: 0.075, ease: 'power2.out' }, 1.245);
 
-	// 1,60 - 1,90 s: quarto branco cai reto de cima como peso e gera impacto com achatamento ~7%,
-	// tremor de 2-3 px e pulso nas linhas (pico do impacto em 1,90 s)
+	// 1,60 - 1,90 s: quarto branco cai reto de cima como peso e gera impacto com achatamento ~7%
 	timeline.to(
 		estado,
 		{
@@ -600,15 +699,48 @@ export function criarAnimacaoControlavel(
 
 	// 2,15 - 2,60 s: pausa com a logo completa e parada (idêntica à pose estática da T2)
 
-	// 2,60 - 3,10 s: encolhe em linha reta até o retângulo do header (contorno e linhas juntos)
+	// 2,60 - 3,10 s: troca sem pulo para o SVG final e voo reto até `alvo().rect`
 	timeline.to(
 		estado,
 		{
 			vooT: 1,
-			duration: 0.5,
+			duration: DURACAO_VOO_S,
 			ease: 'power3.inOut',
 		},
-		2.6,
+		TEMPO_TROCA_SVG_S,
+	);
+
+	// 2,60 - 2,90 s: fade-out das linhas de construção durante o voo
+	timeline.to(
+		estado,
+		{
+			construcaoOpacidade: 0,
+			duration: DURACAO_FADE_CONSTRUCAO_S,
+			ease: 'power2.inOut',
+		},
+		TEMPO_TROCA_SVG_S,
+	);
+
+	// 2,60 - 3,10 s: fade-out do fundo da splash durante o voo (em 2,85 s = 0,50 exato)
+	timeline.to(
+		estado,
+		{
+			fundoOpacidade: 0,
+			duration: DURACAO_VOO_S,
+			ease: 'power2.inOut',
+		},
+		TEMPO_TROCA_SVG_S,
+	);
+
+	// 2,60 - 3,10 s: compensação óptica suave da espessura do contorno até `whiteroom-logo-header.svg`
+	timeline.to(
+		estado,
+		{
+			contornoLarguraSvg: LOGO_HEADER_METRICAS.contornoPx,
+			duration: DURACAO_VOO_S,
+			ease: 'power2.inOut',
+		},
+		TEMPO_TROCA_SVG_S,
 	);
 
 	// Garante duração exata de 3,10 s
@@ -634,10 +766,10 @@ export function criarAnimacaoControlavel(
 
 	const seek = (tempoSeg: number): void => {
 		if (destruida) return;
-		tweenPular?.kill();
-		tweenPular = null;
+		tlPular?.kill();
+		tlPular = null;
 		emPular = false;
-		forcandoVisivel = false;
+		estado.opacidade3D = 1;
 		const t = Math.max(0, Math.min(DURACAO_SPLASH_S, tempoSeg));
 		timeline.pause(t);
 		renderizarQuadro(false);
@@ -661,9 +793,9 @@ export function criarAnimacaoControlavel(
 			}
 
 			emPular = false;
-			forcandoVisivel = false;
-			tweenPular?.kill();
-			tweenPular = null;
+			estado.opacidade3D = 1;
+			tlPular?.kill();
+			tlPular = null;
 			recalcularLayout();
 			timeline.play(0);
 			return p;
@@ -677,43 +809,95 @@ export function criarAnimacaoControlavel(
 			}
 			if (emPular) return p;
 
+			const tempoAtual = timeline.time();
+			const jaNoVooSvg = tempoAtual >= TEMPO_TROCA_SVG_S - 1e-6;
+			const poseFinalCompleta =
+				jaNoVooSvg ||
+				(estado.wPosT >= 1 - 1e-4 &&
+					estado.rPosT >= 1 - 1e-4 &&
+					estado.qPosT >= 1 - 1e-4 &&
+					Math.abs(estado.sqY - 1) < 1e-3 &&
+					Math.abs(estado.shakeX) < 1e-3 &&
+					Math.abs(estado.shakeY) < 1e-3 &&
+					Math.abs(estado.shakeCenaX) < 1e-3 &&
+					Math.abs(estado.shakeCenaY) < 1e-3);
+
 			emPular = true;
-			forcandoVisivel = true;
 			timeline.pause();
 			recalcularLayout();
 
-			const duracao =
-				estado.vooT > 0.01
-					? Math.max(0.08, Math.min(DURACAO_PULAR_S, DURACAO_PULAR_S * (1 - estado.vooT)))
-					: DURACAO_PULAR_S;
+			// Pose completa / já no voo: troca instantânea para o SVG;
+			// Meio da montagem: mostra SVG na pose final no lugar do cubo e faz 3D sumir em ~100 ms.
+			estado.opacidade3D = poseFinalCompleta ? 0 : 1;
 
-			tweenPular?.kill();
-			tweenPular = gsap.to(estado, {
-				progressoConstrucao: 1,
-				pulsoLinhas: 1,
-				wPosT: 1,
-				rPosT: 1,
-				qPosT: 1,
-				sqX: 1,
-				sqY: 1,
-				sqZ: 1,
-				shakeX: 0,
-				shakeY: 0,
-				shakeCenaX: 0,
-				shakeCenaY: 0,
-				vooT: 1,
-				duration: duracao,
-				ease: 'power3.inOut',
+			const duracaoVoo = jaNoVooSvg
+				? Math.max(0.08, Math.min(DURACAO_PULAR_S, DURACAO_PULAR_S * (1 - estado.vooT)))
+				: DURACAO_PULAR_S;
+			const duracaoConstrucao = Math.min(duracaoVoo * 0.6, 0.18);
+
+			tlPular?.kill();
+			const tl = gsap.timeline({
 				onUpdate: () => {
 					renderizarQuadro(true);
 				},
 				onComplete: () => {
-					tweenPular = null;
+					tlPular = null;
 					renderizarQuadro(true);
 					concluir();
 				},
 			});
 
+			if (!poseFinalCompleta) {
+				tl.to(
+					estado,
+					{
+						opacidade3D: 0,
+						duration: DURACAO_FADE_3D_PULAR_S,
+						ease: 'power2.out',
+					},
+					0,
+				);
+			}
+
+			tl.to(
+				estado,
+				{
+					vooT: 1,
+					duration: duracaoVoo,
+					ease: 'power3.inOut',
+				},
+				0,
+			);
+			tl.to(
+				estado,
+				{
+					construcaoOpacidade: 0,
+					duration: duracaoConstrucao,
+					ease: 'power2.inOut',
+				},
+				0,
+			);
+			tl.to(
+				estado,
+				{
+					fundoOpacidade: 0,
+					duration: duracaoVoo,
+					ease: 'power2.inOut',
+				},
+				0,
+			);
+			tl.to(
+				estado,
+				{
+					contornoLarguraSvg: LOGO_HEADER_METRICAS.contornoPx,
+					duration: duracaoVoo,
+					ease: 'power2.inOut',
+				},
+				0,
+			);
+
+			tlPular = tl;
+			renderizarQuadro(false);
 			return p;
 		},
 
@@ -736,9 +920,9 @@ export function criarAnimacaoControlavel(
 		reiniciar(): void {
 			if (destruida) return;
 			emPular = false;
-			forcandoVisivel = false;
-			tweenPular?.kill();
-			tweenPular = null;
+			estado.opacidade3D = 1;
+			tlPular?.kill();
+			tlPular = null;
 			timeline.restart();
 		},
 
@@ -806,6 +990,7 @@ export function criarAnimacaoControlavel(
 
 			const tremorCenaAtivo =
 				Math.abs(estado.shakeCenaX) > 1e-5 || Math.abs(estado.shakeCenaY) > 1e-5;
+			const modoSvg = modoSvgEstaAtivo();
 
 			return {
 				tempo: Number(timeline.time().toFixed(4)),
@@ -818,7 +1003,9 @@ export function criarAnimacaoControlavel(
 					y: Number(estado.shakeY.toFixed(4)),
 				},
 				pulsoLinhas: Number(estado.pulsoLinhas.toFixed(5)),
-				linhasAcompanhamTremorCena: tremorCenaAtivo && estado.vooT <= 1e-6,
+				linhasAcompanhamTremorCena: tremorCenaAtivo && !modoSvg,
+				modoSvgAtivo: modoSvg,
+				escalaRaiz3D: Number(raizCubo.scale.x.toFixed(6)),
 				w: lerPeca(pecas.w),
 				r: {
 					...lerPeca(pecas.r),
@@ -835,8 +1022,8 @@ export function criarAnimacaoControlavel(
 			window.cancelAnimationFrame(resizeRaf);
 			window.removeEventListener('resize', agendarResize);
 			resizeObserver?.disconnect();
-			tweenPular?.kill();
-			tweenPular = null;
+			tlPular?.kill();
+			tlPular = null;
 			timeline.kill();
 			cena.destruir();
 			concluir();

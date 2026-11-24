@@ -1,0 +1,499 @@
+{
+  "rodada": 1,
+  "timestamp": "2026-11-24T03:52:10.269Z",
+  "porta": 4403,
+  "erroGate": null,
+  "astroCheck": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 10532
+  },
+  "astroBuild": {
+    "ok": true,
+    "exitCode": 0,
+    "duracaoMs": 5197
+  },
+  "gerador": {
+    "ok": true,
+    "todosIguais": true,
+    "semGradientesFiltrosImagens": true,
+    "completoLeveOk": true,
+    "metaMaxBytes": 30720,
+    "provisoriaRemovida": true,
+    "resCapturada": 4096,
+    "headerViewBox": {
+      "x": 221.46,
+      "y": 220.17,
+      "size": 580,
+      "cubeCx": 511.4600067138672,
+      "cubeCy": 510.1650085449219,
+      "espContorno": 10
+    },
+    "faviconSpec": {
+      "viewBoxSize": 620,
+      "espContorno": 14,
+      "appIconViewBoxSize": 726,
+      "appIconEspContorno": 5.5
+    },
+    "camadas": [
+      {
+        "nome": "interna",
+        "hex": "#EBEAE6",
+        "loops": 5,
+        "vertices": 59
+      },
+      {
+        "nome": "sombra",
+        "hex": "#C6C5C1",
+        "loops": 7,
+        "vertices": 52
+      },
+      {
+        "nome": "sombra-perna-r",
+        "hex": "#B3B4AE",
+        "loops": 1,
+        "vertices": 4
+      },
+      {
+        "nome": "batente-porta",
+        "hex": "#CCCCC7",
+        "loops": 1,
+        "vertices": 4
+      },
+      {
+        "nome": "topo",
+        "hex": "#FFFFFF",
+        "loops": 2,
+        "vertices": 33
+      },
+      {
+        "nome": "w-externa",
+        "hex": "#171717",
+        "loops": 1,
+        "vertices": 13
+      },
+      {
+        "nome": "r-externa",
+        "hex": "#CD9016",
+        "loops": 2,
+        "vertices": 49
+      }
+    ],
+    "arquivos": {
+      "whiteroom-logo.svg": {
+        "igual": true,
+        "bytes": 7732,
+        "kb": 7.55
+      },
+      "whiteroom-logo-header.svg": {
+        "igual": true,
+        "bytes": 6971,
+        "kb": 6.81
+      },
+      "favicon.svg": {
+        "igual": true,
+        "bytes": 6971,
+        "kb": 6.81
+      },
+      "favicon.ico": {
+        "igual": true,
+        "bytes": 4969,
+        "kb": 4.85
+      },
+      "apple-touch-icon.png": {
+        "igual": true,
+        "bytes": 7610,
+        "kb": 7.43
+      },
+      "icon-192.png": {
+        "igual": true,
+        "bytes": 8141,
+        "kb": 7.95
+      },
+      "icon-512.png": {
+        "igual": true,
+        "bytes": 21766,
+        "kb": 21.26
+      },
+      "site.webmanifest": {
+        "igual": true,
+        "bytes": 347,
+        "kb": 0.34
+      }
+    }
+  },
+  "fidelidadeSvg1024": {
+    "referencia": "docs/gauntlet/t2/rodada-7/captura.png",
+    "captura": "docs/gauntlet/t5/rodada-1/svg-completo-1024.png",
+    "limiar": 0.1,
+    "metaPct": 0.5,
+    "largura": 1024,
+    "altura": 1024,
+    "totalPixels": 1048576,
+    "pixelsDiferentes": 0,
+    "porcentagem": 0,
+    "diffImagem": "docs/gauntlet/t5/rodada-1/svg-completo-diff.png",
+    "ok": true
+  },
+  "troca3dParaSvg": {
+    "desktop": {
+      "largura": 1280,
+      "altura": 800,
+      "totalPixels": 1024000,
+      "pixelsDiferentes": 0,
+      "porcentagem": 0,
+      "diffImagem": "docs/gauntlet/t5/rodada-1/troca-diff-desktop.png",
+      "metaPct": 0.5,
+      "estado259Ok": true,
+      "estado261Ok": true,
+      "ok": true
+    },
+    "mobile": {
+      "largura": 1170,
+      "altura": 2532,
+      "totalPixels": 2962440,
+      "pixelsDiferentes": 65,
+      "porcentagem": 0.0022,
+      "diffImagem": "docs/gauntlet/t5/rodada-1/troca-diff-mobile.png",
+      "metaPct": 0.5,
+      "estado259Ok": true,
+      "estado261Ok": true,
+      "ok": true
+    },
+    "ok": true
+  },
+  "vooEFundo": {
+    "fundoEm285": {
+      "tempo": 2.85,
+      "opacity": 0.5,
+      "ok": true
+    },
+    "alinhamentoPouso": {
+      "dx": 0.5,
+      "dy": 0.5,
+      "dw": 0,
+      "dh": 0
+    },
+    "construcaoEm260": 1,
+    "construcaoEm275": 0.5,
+    "construcaoEm290": 0,
+    "construcaoEm310": 0,
+    "fundoEm310": 0,
+    "ok": true
+  },
+  "headerRecorte4x": {
+    "cropRect": {
+      "left": 137,
+      "top": 4,
+      "width": 56,
+      "height": 56
+    },
+    "zoomFator": 4,
+    "imagem310": "docs/gauntlet/t5/rodada-1/header-3.10s-4x.png",
+    "imagemPosSplash": "docs/gauntlet/t5/rodada-1/header-pos-splash-4x.png",
+    "largura": 56,
+    "altura": 56,
+    "totalPixels": 3136,
+    "pixelsDiferentes": 1,
+    "porcentagem": 0.0319,
+    "diffImagem": null,
+    "ok": true
+  },
+  "poseFinalT4": {
+    "referencia": "docs/gauntlet/t2/rodada-7/captura.png",
+    "captura": "docs/gauntlet/t5/rodada-1/pose-final-1024.png",
+    "limiar": 0.1,
+    "metaPct": 0.3,
+    "largura": 1024,
+    "altura": 1024,
+    "totalPixels": 1048576,
+    "pixelsDiferentes": 0,
+    "porcentagem": 0,
+    "diffImagem": "docs/gauntlet/t5/rodada-1/pose-final-diff.png",
+    "ok": true
+  },
+  "evidencias": {
+    "folhaContato": "docs/gauntlet/t5/rodada-1/folha-contato.png",
+    "favicon": "docs/gauntlet/t5/rodada-1/favicon.png"
+  },
+  "desempenho": {
+    "metaHlrMediaMs": 4,
+    "desktop1280x800": {
+      "dimensoes": {
+        "largura": 1265,
+        "altura": 800
+      },
+      "quadroDeltaMs": {
+        "quadros": 248,
+        "mediaMs": 13.471,
+        "p95Ms": 14.2,
+        "maxMs": 66.7
+      },
+      "trabalhoQuadroMs": {
+        "quadros": 249,
+        "mediaMs": 1.357,
+        "p95Ms": 4.5,
+        "maxMs": 18.4
+      },
+      "hlrMs": {
+        "quadros": 184,
+        "mediaMs": 1.12,
+        "p95Ms": 3.8,
+        "maxMs": 5.5
+      }
+    },
+    "mobile390x844Dpr3": {
+      "dimensoes": {
+        "largura": 375,
+        "altura": 844
+      },
+      "quadroDeltaMs": {
+        "quadros": 253,
+        "mediaMs": 13.288,
+        "p95Ms": 14.2,
+        "maxMs": 20.7
+      },
+      "trabalhoQuadroMs": {
+        "quadros": 254,
+        "mediaMs": 1.112,
+        "p95Ms": 3.2,
+        "maxMs": 13.4
+      },
+      "hlrMs": {
+        "quadros": 189,
+        "mediaMs": 0.86,
+        "p95Ms": 2.6,
+        "maxMs": 4.8
+      }
+    },
+    "hlrOk": true
+  },
+  "console": {
+    "totalErros": 0,
+    "totalAvisos": 0,
+    "erros": [],
+    "avisos": [],
+    "pageErrors": []
+  },
+  "fluxoReal": {
+    "todosOk": true,
+    "fluxoNormalEReload": {
+      "ok": true,
+      "iniciouSplash": true,
+      "duracaoTotalMs": 3167,
+      "probe": {
+        "ok": true,
+        "amostrasTotais": 233,
+        "amostrasAntes3D": 4,
+        "quadrosReservaVisivelAntes3D": 0,
+        "quadrosReservaVisivelTotal": 0,
+        "quadrosSvgFinal": 37,
+        "fundoEmFadeDuranteSvg": true
+      },
+      "estadoPosFim": {
+        "alvoVisivel": true,
+        "alvoDim": {
+          "width": 40,
+          "height": 40
+        },
+        "sessionFlag": "1"
+      },
+      "estadoAposReload": {
+        "splashAtiva": false,
+        "overlayPresente": false,
+        "alvoVisivel": true
+      }
+    },
+    "headerLogoNova": {
+      "ok": true,
+      "temSvg": true,
+      "viewBox": "221.46 220.17 580 580",
+      "temFaces": true,
+      "temContorno": true,
+      "temConstrucao": false,
+      "contornoStrokeWidth": "10.00",
+      "alvoDim": {
+        "width": 40,
+        "height": 40
+      }
+    },
+    "pularMeioMontagem": {
+      "ok": true,
+      "tempoAposCliqueMs": 307,
+      "alvoVisivel": true,
+      "amostras": 23,
+      "quadrosSvgFinal": 23,
+      "svgLarguraInicialPx": 800,
+      "svgLarguraFinalPx": 70.62,
+      "canvasSumiu": true
+    },
+    "pularPosTroca": {
+      "ok": true,
+      "tempoAposCliqueMs": 306,
+      "alvoVisivel": true,
+      "amostras": 23,
+      "reexibiu3D": false
+    },
+    "pularEsc": {
+      "ok": true,
+      "tempoAposEscMs": 300,
+      "alvoVisivel": true
+    },
+    "movimentoReduzido": {
+      "ok": true,
+      "iniciouReduzida": true,
+      "duracaoMs": 981,
+      "alvoVisivel": true,
+      "quadrosVisiveis": 71,
+      "visivelDesdeInicio": true,
+      "usaWhiteroomLogoSvg": true,
+      "maxDeslocamentoPx": 0,
+      "fezFade": true
+    },
+    "fallbackFalha": {
+      "ok": true,
+      "alvoVisivel": true,
+      "quadrosVisiveis": 38,
+      "usaWhiteroomLogoSvg": true,
+      "deslocamentoPx": 594.45,
+      "diminuiuTamanho": true,
+      "aproximouDoHeader": true
+    },
+    "regressaoDebugT2": {
+      "ok": true,
+      "painelDebugOk": true,
+      "hlrDebugOk": true,
+      "capturaT2Ok": true
+    },
+    "determinismoEResize": {
+      "ok": true,
+      "igual3d": true,
+      "igualSvgTransform": true,
+      "igualFundoOpacity": true,
+      "erroCentroAposResizePx": {
+        "dx": 0,
+        "dy": 0.5
+      }
+    },
+    "estabilidadePosImpacto": {
+      "ok": true,
+      "solidoAntes": true,
+      "solidoPosContato": 0,
+      "maxErrW": 0,
+      "maxErrR": 0,
+      "maxErrRel": 0
+    },
+    "faviconEManifest": {
+      "ok": true,
+      "todos200": true,
+      "icoTamanhos": [
+        16,
+        32,
+        48
+      ],
+      "icoOk": true,
+      "manifestOk": true,
+      "headOk": true,
+      "headLinks": {
+        "temSvgIcon": true,
+        "temIcoIcon": true,
+        "temAppleTouch": true,
+        "temManifest": true
+      },
+      "rotas": {
+        "/favicon.svg": {
+          "statusCode": 200,
+          "bytes": 6971,
+          "contentType": "image/svg+xml",
+          "ok": true
+        },
+        "/favicon.ico": {
+          "statusCode": 200,
+          "bytes": 4969,
+          "contentType": "image/x-icon",
+          "ok": true
+        },
+        "/apple-touch-icon.png": {
+          "statusCode": 200,
+          "bytes": 7610,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/icon-192.png": {
+          "statusCode": 200,
+          "bytes": 8141,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/icon-512.png": {
+          "statusCode": 200,
+          "bytes": 21766,
+          "contentType": "image/png",
+          "ok": true
+        },
+        "/site.webmanifest": {
+          "statusCode": 200,
+          "bytes": 347,
+          "contentType": "application/manifest+json",
+          "ok": true
+        }
+      }
+    }
+  },
+  "favicon": {
+    "ok": true,
+    "todos200": true,
+    "icoTamanhos": [
+      16,
+      32,
+      48
+    ],
+    "icoOk": true,
+    "manifestOk": true,
+    "headOk": true,
+    "headLinks": {
+      "temSvgIcon": true,
+      "temIcoIcon": true,
+      "temAppleTouch": true,
+      "temManifest": true
+    },
+    "rotas": {
+      "/favicon.svg": {
+        "statusCode": 200,
+        "bytes": 6971,
+        "contentType": "image/svg+xml",
+        "ok": true
+      },
+      "/favicon.ico": {
+        "statusCode": 200,
+        "bytes": 4969,
+        "contentType": "image/x-icon",
+        "ok": true
+      },
+      "/apple-touch-icon.png": {
+        "statusCode": 200,
+        "bytes": 7610,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/icon-192.png": {
+        "statusCode": 200,
+        "bytes": 8141,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/icon-512.png": {
+        "statusCode": 200,
+        "bytes": 21766,
+        "contentType": "image/png",
+        "ok": true
+      },
+      "/site.webmanifest": {
+        "statusCode": 200,
+        "bytes": 347,
+        "contentType": "application/manifest+json",
+        "ok": true
+      }
+    }
+  }
+}

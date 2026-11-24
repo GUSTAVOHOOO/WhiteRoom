@@ -4,6 +4,7 @@ import {
 	DURACAO_SPLASH_S,
 	type TelemetriaPosePecas,
 } from '../animacao';
+import { atualizarEnquadramentoCamera } from './camera';
 import { REFERENCIA_PX } from './constantes';
 import { criarCena, type CenaCubo } from './cubo';
 import { POSICOES_FINAIS } from './pecas';
@@ -14,6 +15,7 @@ export interface ElementosDebugSplash {
 	logoEl: HTMLElement;
 	canvasEl: HTMLCanvasElement;
 	linhasEl: SVGSVGElement;
+	svgFinalEl?: HTMLElement;
 	alvoEl?: HTMLElement;
 }
 
@@ -47,10 +49,22 @@ export interface RelatorioBenchT4 {
 	obterPosePecas: () => TelemetriaPosePecas;
 }
 
+export interface DadosExportSvg {
+	res: number;
+	referenciaPx: number;
+	dConstrucao: string;
+	dContorno: string;
+	hlrSvgString: string;
+	bboxContorno: { x: number; y: number; width: number; height: number };
+	bboxConstrucao: { x: number; y: number; width: number; height: number };
+	pngDataUrl: string;
+}
+
 declare global {
 	interface Window {
 		__wrHlrBench?: RelatorioBenchHlr;
 		__wrT4Bench?: RelatorioBenchT4;
+		__wrExportSvg?: DadosExportSvg;
 	}
 }
 
@@ -269,7 +283,7 @@ function resumirAmostrasMs(amostras: readonly number[]): ResumoMetricaMs {
  *   e ms por quadro (além de expor `window.__wrT4Bench` para o gate de desempenho).
  */
 function iniciarModoT4(elementos: ElementosDebugSplash): void {
-	const { overlayEl, fundoEl, logoEl, canvasEl, linhasEl, alvoEl } = elementos;
+	const { overlayEl, fundoEl, logoEl, canvasEl, linhasEl, svgFinalEl, alvoEl } = elementos;
 
 	logoEl.style.display = 'none';
 	fundoEl.style.opacity = '1';
@@ -309,6 +323,8 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
 
 		const anim = criarAnimacaoControlavel(canvasEl, obterAlvo, {
 			svgLinhas: linhasEl,
+			svgFinal: svgFinalEl,
+			fundo: fundoEl,
 			container: overlayEl,
 			dpr: ehReferencia1024 ? 1 : undefined,
 		});
@@ -427,9 +443,11 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
 
 	const anim = criarAnimacaoControlavel(canvasEl, obterAlvo, {
 		svgLinhas: linhasEl,
+		svgFinal: svgFinalEl,
+		fundo: fundoEl,
 		container: overlayEl,
 		loop: true,
-		onQuadro: ({ tempo, hlrMs, trabalhoMs }) => {
+		onQuadro: ({ tempo, hlrMs, trabalhoMs, hlrExecutado }) => {
 			const agora = performance.now();
 			if (!passagemCompleta) {
 				if (ultimoTick > 0) {
@@ -439,7 +457,9 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
 					}
 				}
 				amostrasTrabalho.push(trabalhoMs);
-				amostrasHlr.push(hlrMs);
+				if (hlrExecutado) {
+					amostrasHlr.push(hlrMs);
+				}
 			}
 			ultimoTick = agora;
 			atualizarPainel(tempo, anim);
@@ -482,6 +502,95 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
 }
 
 /**
+ * Modo de exportação vetorial `/?debug=export-svg`:
+ * - Extrai o HLR exato da pose final em `1024×1024` (`dConstrucao`, `dContorno`, `paraSvgString()`).
+ * - Renderiza somente as malhas WebGL (fundo transparente, sem linhas SVG) em alta resolução
+ *   (`res × res`, padrão `4096`, `dpr = 1`) e expõe os dados em `window.__wrExportSvg`.
+ */
+function iniciarModoExportSvg(elementos: ElementosDebugSplash): void {
+	const { overlayEl, fundoEl, logoEl, canvasEl, linhasEl, svgFinalEl } = elementos;
+
+	const params = new URLSearchParams(window.location.search);
+	const resParam = Number(params.get('res'));
+	const res =
+		Number.isFinite(resParam) && resParam >= 1024
+			? Math.min(4096, Math.round(resParam))
+			: 4096;
+
+	logoEl.style.display = 'none';
+	if (svgFinalEl) svgFinalEl.style.display = 'none';
+	fundoEl.style.display = 'none';
+	overlayEl.style.position = 'fixed';
+	overlayEl.style.top = '0';
+	overlayEl.style.left = '0';
+	overlayEl.style.right = 'auto';
+	overlayEl.style.bottom = 'auto';
+	overlayEl.style.width = `${REFERENCIA_PX}px`;
+	overlayEl.style.height = `${REFERENCIA_PX}px`;
+	overlayEl.style.display = 'block';
+
+	canvasEl.style.opacity = '1';
+	canvasEl.style.display = 'block';
+	canvasEl.style.width = `${REFERENCIA_PX}px`;
+	canvasEl.style.height = `${REFERENCIA_PX}px`;
+	linhasEl.classList.remove('hidden');
+	linhasEl.style.display = 'block';
+	linhasEl.style.width = `${REFERENCIA_PX}px`;
+	linhasEl.style.height = `${REFERENCIA_PX}px`;
+
+	const cena = criarCena(canvasEl, linhasEl);
+	cena.redimensionar(REFERENCIA_PX, REFERENCIA_PX, 1);
+
+	window.requestAnimationFrame(() => {
+		cena.renderizar();
+		const hlrSvgString = cena.linhas.paraSvgString();
+		const pathConstrucao = linhasEl.querySelector('[data-hlr-camada="construcao"]');
+		const pathContorno = linhasEl.querySelector('[data-hlr-camada="contorno"]');
+		const dConstrucao = pathConstrucao?.getAttribute('d') ?? '';
+		const dContorno = pathContorno?.getAttribute('d') ?? '';
+		const bbCont =
+			pathContorno instanceof SVGGraphicsElement
+				? pathContorno.getBBox()
+				: new DOMRect(0, 0, REFERENCIA_PX, REFERENCIA_PX);
+		const bbConst =
+			pathConstrucao instanceof SVGGraphicsElement && dConstrucao
+				? pathConstrucao.getBBox()
+				: bbCont;
+
+		// Renderiza somente o 3D em alta resolução com fundo transparente para vetorização das faces/sombras
+		linhasEl.style.display = 'none';
+		cena.renderer.setPixelRatio(1);
+		cena.renderer.setSize(res, res, false);
+		atualizarEnquadramentoCamera(cena.camera, res, res);
+		cena.renderer.render(cena.scene, cena.camera);
+		const pngDataUrl = canvasEl.toDataURL('image/png');
+
+		window.__wrExportSvg = {
+			res,
+			referenciaPx: REFERENCIA_PX,
+			dConstrucao,
+			dContorno,
+			hlrSvgString,
+			bboxContorno: {
+				x: bbCont.x,
+				y: bbCont.y,
+				width: bbCont.width,
+				height: bbCont.height,
+			},
+			bboxConstrucao: {
+				x: bbConst.x,
+				y: bbConst.y,
+				width: bbConst.width,
+				height: bbConst.height,
+			},
+			pngDataUrl,
+		};
+
+		document.documentElement.dataset.exportSvgPronto = '1';
+	});
+}
+
+/**
  * Inicializa os modos de desenvolvimento/aferição na home:
  * - `/?debug`: cubo 3D parado em tela cheia sobre `#FAFAF8` com JPG de referência
  *   sobreposto alinhado ao cubo, slider de opacidade (0–100%), toggles "Só JPG" / "Só 3D"
@@ -490,6 +599,7 @@ function iniciarModoT4(elementos: ElementosDebugSplash): void {
  *   sinalizando prontidão via `document.documentElement.dataset.capturaPronta = '1'`.
  * - `/?debug=hlr`: coreografia simulada das 3 peças medindo `atualizar()` por quadro.
  * - `/?debug=t4` / `/?debug=t4&t=<seg>`: animação real T4 em loop ou captura determinística.
+ * - `/?debug=export-svg`: exportação da pose final (HLR 1024 + render 4096 transparente).
  */
 export function iniciarModoDebug(
 	elementos: ElementosDebugSplash,
@@ -499,10 +609,15 @@ export function iniciarModoDebug(
 		iniciarModoT4(elementos);
 		return;
 	}
+	if (modoDebug === 'export-svg') {
+		iniciarModoExportSvg(elementos);
+		return;
+	}
 
-	const { overlayEl, fundoEl, logoEl, canvasEl, linhasEl } = elementos;
+	const { overlayEl, fundoEl, logoEl, canvasEl, linhasEl, svgFinalEl } = elementos;
 
 	logoEl.style.display = 'none';
+	if (svgFinalEl) svgFinalEl.style.display = 'none';
 	fundoEl.style.opacity = '1';
 	canvasEl.style.opacity = '1';
 	canvasEl.style.display = 'block';

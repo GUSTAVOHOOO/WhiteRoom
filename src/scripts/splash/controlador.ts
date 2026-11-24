@@ -5,6 +5,11 @@ import type {
 	CriarAnimacao,
 	OpcoesAnimacaoSplash,
 } from './contrato';
+import {
+	LOGO_CONTORNO_COMPLETO_PX,
+	LOGO_HEADER_METRICAS,
+	LOGO_VIEWBOX_COMPLETO,
+} from './logo';
 
 declare global {
 	interface Window {
@@ -78,6 +83,7 @@ export function iniciarSplash(): void {
 	const logoEl = document.querySelector<HTMLElement>('[data-splash-logo]');
 	const canvasEl = document.querySelector<HTMLCanvasElement>('[data-splash-canvas]');
 	const linhasEl = document.querySelector<SVGSVGElement>('[data-splash-linhas]');
+	const svgFinalEl = document.querySelector<HTMLElement>('[data-splash-svg-final]');
 	const alvoEl = document.querySelector<HTMLElement>('[data-splash-alvo]');
 
 	if (!overlayEl || !fundoEl || !logoEl || !canvasEl || !alvoEl) {
@@ -92,7 +98,15 @@ export function iniciarSplash(): void {
 		const modoDebug = paramsDebug.get('debug') ?? '';
 		void import('./cena/debug').then(({ iniciarModoDebug }) => {
 			iniciarModoDebug(
-				{ overlayEl, fundoEl, logoEl, canvasEl, linhasEl, alvoEl },
+				{
+					overlayEl,
+					fundoEl,
+					logoEl,
+					canvasEl,
+					linhasEl,
+					svgFinalEl: svgFinalEl ?? undefined,
+					alvoEl,
+				},
 				modoDebug,
 			);
 		});
@@ -111,6 +125,8 @@ export function iniciarSplash(): void {
 	let timerTeto: number | null = null;
 	let tweenFallbackLogo: gsap.core.Tween | null = null;
 	let tweenFallbackFundo: gsap.core.Tween | null = null;
+	let tweenFallbackConstrucao: gsap.core.Tween | null = null;
+	let tweenFallbackContorno: gsap.core.Tween | null = null;
 	let tweenReduzida: gsap.core.Tween | null = null;
 
 	const obterAlvo = (): AlvoHeader => ({
@@ -140,12 +156,14 @@ export function iniciarSplash(): void {
 
 		tweenFallbackLogo?.kill();
 		tweenFallbackFundo?.kill();
+		tweenFallbackConstrucao?.kill();
+		tweenFallbackContorno?.kill();
 		tweenReduzida?.kill();
-		gsap.killTweensOf(
-			linhasEl
-				? [overlayEl, fundoEl, logoEl, canvasEl, linhasEl]
-				: [overlayEl, fundoEl, logoEl, canvasEl],
-		);
+
+		const alvosKill: Element[] = [overlayEl, fundoEl, logoEl, canvasEl];
+		if (linhasEl) alvosKill.push(linhasEl);
+		if (svgFinalEl) alvosKill.push(svgFinalEl);
+		gsap.killTweensOf(alvosKill);
 
 		window.removeEventListener('pointerdown', onPointerDown);
 		window.removeEventListener('keydown', onKeyDown);
@@ -167,25 +185,33 @@ export function iniciarSplash(): void {
 	const calcularDeltaFlip = (): {
 		dx: number;
 		dy: number;
-		scaleX: number;
-		scaleY: number;
+		scale: number;
+		originX: string;
+		originY: string;
 	} => {
 		const destino = obterAlvo().rect;
 		const origemLargura = logoEl.offsetWidth;
 		const origemAltura = logoEl.offsetHeight;
-		const origemCx = (overlayEl.clientWidth || window.innerWidth) / 2;
-		const origemCy = (overlayEl.clientHeight || window.innerHeight) / 2;
+		const lado = Math.min(origemLargura, origemAltura);
+		const originFracX = LOGO_HEADER_METRICAS.cx / LOGO_VIEWBOX_COMPLETO;
+		const originFracY = LOGO_HEADER_METRICAS.cy / LOGO_VIEWBOX_COMPLETO;
+		const origemCx =
+			(overlayEl.clientWidth || window.innerWidth) / 2 + (originFracX - 0.5) * lado;
+		const origemCy =
+			(overlayEl.clientHeight || window.innerHeight) / 2 + (originFracY - 0.5) * lado;
 		const destinoCx = destino.left + destino.width / 2;
 		const destinoCy = destino.top + destino.height / 2;
+		const alvoLado = Math.min(destino.width, destino.height);
 
-		const scaleX = origemLargura > 0 ? destino.width / origemLargura : 1;
-		const scaleY = origemAltura > 0 ? destino.height / origemAltura : 1;
+		const scale =
+			lado > 0 ? (alvoLado * LOGO_VIEWBOX_COMPLETO) / (lado * LOGO_HEADER_METRICAS.lado) : 1;
 
 		return {
 			dx: destinoCx - origemCx,
 			dy: destinoCy - origemCy,
-			scaleX,
-			scaleY,
+			scale,
+			originX: `${(originFracX * 100).toFixed(4)}%`,
+			originY: `${(originFracY * 100).toFixed(4)}%`,
 		};
 	};
 
@@ -199,26 +225,57 @@ export function iniciarSplash(): void {
 		if (linhasEl) {
 			linhasEl.style.display = 'none';
 		}
+		if (svgFinalEl) {
+			svgFinalEl.style.display = 'none';
+		}
 
 		tweenFallbackLogo?.kill();
 		tweenFallbackFundo?.kill();
+		tweenFallbackConstrucao?.kill();
+		tweenFallbackContorno?.kill();
+
+		const { dx, dy, scale, originX, originY } = calcularDeltaFlip();
+		logoEl.style.transformOrigin = `${originX} ${originY}`;
 
 		if (!preservarTransform) {
-			gsap.set(logoEl, { x: 0, y: 0, scaleX: 1, scaleY: 1 });
+			gsap.set(logoEl, { x: 0, y: 0, scale: 1 });
 		}
-		const { dx, dy, scaleX, scaleY } = calcularDeltaFlip();
+
+		const pathConstrucao = logoEl.querySelector<SVGPathElement>('[data-logo-camada="construcao"]');
+		const pathContorno = logoEl.querySelector<SVGPathElement>('[data-logo-camada="contorno"]');
+
+		if (pathConstrucao) {
+			tweenFallbackConstrucao = gsap.to(pathConstrucao, {
+				opacity: 0,
+				duration: Math.min(duracaoSeg * 0.6, 0.3),
+				ease: 'power2.inOut',
+			});
+		}
+		if (pathContorno) {
+			const estadoContorno = {
+				largura:
+					Number(pathContorno.getAttribute('stroke-width')) || LOGO_CONTORNO_COMPLETO_PX,
+			};
+			tweenFallbackContorno = gsap.to(estadoContorno, {
+				largura: LOGO_HEADER_METRICAS.contornoPx,
+				duration: duracaoSeg,
+				ease: 'power2.inOut',
+				onUpdate: () => {
+					pathContorno.setAttribute('stroke-width', estadoContorno.largura.toFixed(2));
+				},
+			});
+		}
 
 		tweenFallbackFundo = gsap.to(fundoEl, {
 			opacity: 0,
 			duration: duracaoSeg,
-			ease: 'power2.out',
+			ease: 'power2.inOut',
 		});
 
 		tweenFallbackLogo = gsap.to(logoEl, {
 			x: dx,
 			y: dy,
-			scaleX,
-			scaleY,
+			scale,
 			duration: duracaoSeg,
 			ease: 'power3.inOut',
 			onComplete: finalizar,
@@ -255,20 +312,8 @@ export function iniciarSplash(): void {
 
 		if (animacao3D) {
 			const instancia = animacao3D;
-			void instancia
-				.pular()
-				.then(() => {
-					if (finalizada) return;
-					return new Promise<void>((resolve) => {
-						gsap.to(fundoEl, {
-							opacity: 0,
-							duration: 0.2,
-							ease: 'power2.out',
-							onComplete: resolve,
-						});
-					});
-				})
-				.finally(finalizar);
+			// O fade do fundo acontece durante o voo do SVG dentro de `instancia.pular()`
+			void instancia.pular().finally(finalizar);
 			return;
 		}
 
@@ -281,6 +326,8 @@ export function iniciarSplash(): void {
 				const escalaTempo = restanteLogo / VOO_PULAR_S;
 				tweenFallbackLogo?.timeScale(escalaTempo);
 				tweenFallbackFundo?.timeScale(escalaTempo);
+				tweenFallbackConstrucao?.timeScale(escalaTempo);
+				tweenFallbackContorno?.timeScale(escalaTempo);
 			}
 			return;
 		}
@@ -347,6 +394,8 @@ export function iniciarSplash(): void {
 
 	void carregar3D(canvasEl, obterAlvo, flags, {
 		svgLinhas: linhasEl ?? undefined,
+		svgFinal: svgFinalEl ?? undefined,
+		fundo: fundoEl,
 		container: overlayEl,
 	})
 		.then((instancia) => {
@@ -362,7 +411,8 @@ export function iniciarSplash(): void {
 			limparTimers();
 			animacao3D = instancia;
 
-			// 3D pronto a tempo: mantém a logo provisória oculta, exibe canvas + camada SVG de linhas e toca
+			// 3D pronto a tempo: mantém a logo de reserva oculta, exibe canvas + camada SVG de linhas e toca.
+			// O fade do fundo acontece durante o voo do SVG (2,60 → 3,10 s) dentro de `instancia.tocar()`.
 			logoEl.style.visibility = 'hidden';
 			canvasEl.style.opacity = '1';
 			if (linhasEl) {
@@ -371,17 +421,7 @@ export function iniciarSplash(): void {
 				linhasEl.style.opacity = '1';
 			}
 
-			return instancia.tocar().then(() => {
-				if (finalizada || pulando) return;
-				return new Promise<void>((resolve) => {
-					gsap.to(fundoEl, {
-						opacity: 0,
-						duration: 0.25,
-						ease: 'power2.out',
-						onComplete: resolve,
-					});
-				});
-			});
+			return instancia.tocar();
 		})
 		.then(() => {
 			if (animacao3D && !finalizada && !pulando) {

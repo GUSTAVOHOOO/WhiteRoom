@@ -1,6 +1,6 @@
 ---
 import refJpg from '../../75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg';
-import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
+import { LOGO_SVG } from '../scripts/splash/logo';
 ---
 
 <div
@@ -13,9 +13,9 @@ import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
 	<div data-splash-fundo class="absolute inset-0 bg-papel"></div>
 	<div
 		data-splash-logo
-		class="pointer-events-none relative z-10 block h-[55vmin] w-[55vmin] will-change-transform [&>svg]:h-full [&>svg]:w-full"
+		class="pointer-events-none relative z-10 block aspect-square w-full max-w-[100vh] [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
 	>
-		<Fragment set:html={LOGO_PROVISORIA_SVG} />
+		<Fragment set:html={LOGO_SVG} />
 	</div>
 	<canvas
 		data-splash-canvas
@@ -25,6 +25,12 @@ import { LOGO_PROVISORIA_SVG } from '../scripts/splash/logo';
 		data-splash-linhas
 		class="pointer-events-none absolute inset-0 z-30 hidden h-full w-full"
 	></svg>
+	<div
+		data-splash-svg-final
+		class="pointer-events-none absolute top-0 left-0 z-35 hidden [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
+	>
+		<Fragment set:html={LOGO_SVG} />
+	</div>
 </div>
 
 <script>
