@@ -128,21 +128,23 @@ function encerrarProcesso(proc) {
 }
 
 async function abrirNavegador() {
-	const argsGpu = ['--enable-webgl', '--ignore-gpu-blocklist'];
+	const argsGpu = ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-features=BackForwardCache'];
 	const argsSw = [
 		'--enable-webgl',
 		'--ignore-gpu-blocklist',
+		'--enable-features=BackForwardCache',
 		'--use-gl=angle',
 		'--use-angle=swiftshader-webgl',
 		'--enable-unsafe-swiftshader',
 	];
+	const ignoreDefaultArgs = ['--disable-back-forward-cache'];
 	try {
-		return await chromium.launch({ headless: true, args: argsGpu });
+		return await chromium.launch({ headless: true, ignoreDefaultArgs, args: argsGpu });
 	} catch {
 		try {
-			return await chromium.launch({ channel: 'chrome', headless: true, args: argsGpu });
+			return await chromium.launch({ channel: 'chrome', headless: true, ignoreDefaultArgs, args: argsGpu });
 		} catch {
-			return await chromium.launch({ channel: 'chrome', headless: true, args: argsSw });
+			return await chromium.launch({ channel: 'chrome', headless: true, ignoreDefaultArgs, args: argsSw });
 		}
 	}
 }
@@ -222,7 +224,21 @@ function extrairPngsDeIco(icoBuf) {
 	return out;
 }
 
-async function gerarFolhaContatoT6(dirSaida, tabelaEnquadramento, capturasPorVp) {
+const ESTADOS_CAPTURA_BARRA = [
+	{ id: '10pct', label: 'barra ~10%', url: '/?debug=barra&p=10&opacidade=1&fase=visivel' },
+	{ id: '50pct', label: 'barra 50%', url: '/?debug=barra&p=50&opacidade=1&fase=visivel' },
+	{ id: '90pct', label: 'barra 90%', url: '/?debug=barra&p=90&opacidade=1&fase=visivel' },
+	{ id: '100pct', label: 'barra 100%', url: '/?debug=barra&p=100&opacidade=1&fase=visivel' },
+	{ id: 'fade', label: 'fade saída', url: '/?debug=barra&p=100&opacidade=0.45&fase=saindo' },
+	{ id: 'frame1', label: '1º quadro anim.', url: '/?debug=t4&t=0.05' },
+];
+
+const VIEWPORTS_BARRA = [
+	{ id: '390x844-dpr3', label: 'Barra de carregamento — 390×844 dpr 3 (celular)', width: 390, height: 844, dpr: 3, isMobile: true, hasTouch: true },
+	{ id: '1280x800-dpr1', label: 'Barra de carregamento — 1280×800 dpr 1 (desktop)', width: 1280, height: 800, dpr: 1, isMobile: false, hasTouch: false },
+];
+
+async function gerarFolhaContatoT6(dirSaida, tabelaEnquadramento, capturasPorVp, capturasBarraPorVp = null) {
 	const cellW = 190;
 	const cellH = 210;
 	const colLabelH = 26;
@@ -234,16 +250,23 @@ async function gerarFolhaContatoT6(dirSaida, tabelaEnquadramento, capturasPorVp)
 
 	const cols = TEMPOS_CAPTURA.length;
 	const rows = VIEWPORTS_MOBILE.length;
-	const totalW = pad * 2 + cols * cellW + (cols - 1) * gapX;
+	const contentW = cols * cellW + (cols - 1) * gapX;
+	const totalW = pad * 2 + contentW;
 	const rowBlockH = rowHeaderH + colLabelH + cellH;
-	const totalH = pad * 2 + tituloH + rows * rowBlockH + (rows - 1) * gapY;
+
+	const barraRows = capturasBarraPorVp ? VIEWPORTS_BARRA.length : 0;
+	const barraCols = ESTADOS_CAPTURA_BARRA.length;
+	const barraCellW = Math.floor((contentW - (barraCols - 1) * gapX) / barraCols);
+	const barraBlockTotalH = barraRows > 0 ? barraRows * (rowBlockH + gapY) : 0;
+
+	const totalH = pad * 2 + tituloH + barraBlockTotalH + rows * rowBlockH + (rows - 1) * gapY;
 
 	const overlays = [];
 	overlays.push({
 		input: criarEtiquetaSvg(
-			totalW - pad * 2,
+			contentW,
 			tituloH,
-			`T6 Rodada ${rodada} — Splash no Celular e Tablet (0 · 0,25 · 0,7 · 1,25 · 1,9 · 2,4 · 2,75 · 3,1 s)`,
+			`T6 Rodada ${rodada} — Barra de Carregamento + Splash no Celular e Tablet`,
 			'#171717',
 			'#FAFAF8',
 			16,
@@ -252,16 +275,54 @@ async function gerarFolhaContatoT6(dirSaida, tabelaEnquadramento, capturasPorVp)
 		top: pad,
 	});
 
+	let yCursor = pad + tituloH;
+
+	if (capturasBarraPorVp) {
+		for (let r = 0; r < barraRows; r++) {
+			const vp = VIEWPORTS_BARRA[r];
+			const yRow = yCursor;
+			overlays.push({
+				input: criarEtiquetaSvg(contentW, rowHeaderH, vp.label, '#2E2E2B', '#FAFAF8', 13),
+				left: pad,
+				top: yRow,
+			});
+
+			for (let c = 0; c < barraCols; c++) {
+				const est = ESTADOS_CAPTURA_BARRA[c];
+				const xCell = pad + c * (barraCellW + gapX);
+				const yLabel = yRow + rowHeaderH;
+				const yImg = yLabel + colLabelH;
+
+				overlays.push({
+					input: criarEtiquetaSvg(barraCellW, colLabelH, est.label, '#444440', '#FAFAF8', 12),
+					left: xCell,
+					top: yLabel,
+				});
+
+				const imgPath = capturasBarraPorVp[vp.id]?.[est.id];
+				if (imgPath && fs.existsSync(imgPath)) {
+					const thumb = await sharp(imgPath)
+						.resize(barraCellW, cellH, { fit: 'contain', background: { r: 235, g: 234, b: 230, alpha: 1 } })
+						.png()
+						.toBuffer();
+					overlays.push({ input: thumb, left: xCell, top: yImg });
+				}
+			}
+
+			yCursor += rowBlockH + gapY;
+		}
+	}
+
 	for (let r = 0; r < rows; r++) {
 		const vp = VIEWPORTS_MOBILE[r];
 		const info = tabelaEnquadramento.find((x) => x.id === vp.id);
-		const yRow = pad + tituloH + r * (rowBlockH + gapY);
+		const yRow = yCursor + r * (rowBlockH + gapY);
 
 		const resumoLinha = info
 			? `${vp.label} — cubo ${info.cuboLarguraPx}×${info.cuboAlturaPx} px (${info.fracaoMenorDimPct}% da menor dim.) · folga header ${info.folgaHeaderPx} px · folga base ${info.folgaBasePx} px`
 			: vp.label;
 		overlays.push({
-			input: criarEtiquetaSvg(totalW - pad * 2, rowHeaderH, resumoLinha, '#2E2E2B', '#FAFAF8', 13),
+			input: criarEtiquetaSvg(contentW, rowHeaderH, resumoLinha, '#2E2E2B', '#FAFAF8', 13),
 			left: pad,
 			top: yRow,
 		});
@@ -365,6 +426,7 @@ let pousoDprFracionarioResumo = null;
 let desempenhoCelularResumo = null;
 let reduzidoEFallbackCelularResumo = null;
 let regressaoT5Resumo = null;
+let barraECarregamentoResumo = null;
 let folhaPathRel = null;
 
 try {
@@ -1150,11 +1212,22 @@ try {
 					});
 				});
 				await pagePronto.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
-				await pagePronto.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 15000 });
-				const prontoInfo = await pagePronto.evaluate(() => ({
-					prontoMs: window.__t3dPronto !== null ? Number(window.__t3dPronto.toFixed(1)) : null,
-					fallbackDisparou: window.__fallbackDisparou,
-				}));
+				await pagePronto.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 20000 });
+				const prontoInfo = await pagePronto.evaluate(() => {
+					const est = window.__wrSplashEstado;
+					const prontoMs =
+						est && typeof est.tempo3dProntoMs === 'number'
+							? est.tempo3dProntoMs
+							: window.__t3dPronto !== null
+								? Number(window.__t3dPronto.toFixed(1))
+								: null;
+					return {
+						prontoMs,
+						animacaoInicioMs: est?.tempoAnimacaoInicioMs ?? null,
+						barraExibida: est?.barraExibida ?? false,
+						fallbackDisparou: Boolean(window.__fallbackDisparou || est?.usouFallback),
+					};
+				});
 				await ctxPronto.close();
 
 				// 8b. ms por quadro em `/?debug=t4` (0–3,1 s)
@@ -1257,18 +1330,20 @@ try {
 		{
 			const r11 = {};
 
-			// 1. Fluxo normal + reload
+			// 1. Fluxo normal + reload (T6 rodada 2: sem sessionStorage, reload repete a splash)
 			{
 				const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 				const page = await ctx.newPage();
 				anexarColetaConsole(page, 'reg-t5-normal', consoleMensagens);
 				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
 				const ini = await page.evaluate(() => document.documentElement.classList.contains('splash-ativa'));
-				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 7000 });
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
 				const flag = await page.evaluate(() => sessionStorage.getItem('wr-splash-vista'));
-				await page.reload({ waitUntil: 'networkidle' });
-				const aposReload = await page.evaluate(() => !document.documentElement.classList.contains('splash-ativa') && !document.querySelector('[data-splash-overlay]'));
-				r11.fluxoNormalEReload = { ok: ini && flag === '1' && aposReload };
+				await page.reload({ waitUntil: 'domcontentloaded' });
+				const iniReload = await page.evaluate(() => document.documentElement.classList.contains('splash-ativa'));
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
+				const posReload = await page.evaluate(() => !document.documentElement.classList.contains('splash-ativa') && !document.querySelector('[data-splash-overlay]'));
+				r11.fluxoNormalEReload = { ok: ini && flag === null && iniReload && posReload };
 				await ctx.close();
 			}
 
@@ -1293,7 +1368,7 @@ try {
 				const page = await ctx.newPage();
 				anexarColetaConsole(page, 'reg-t5-pular-meio', consoleMensagens);
 				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
-				await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('[data-splash-canvas]')).opacity) === 1, undefined, { timeout: 3000 });
+				await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('[data-splash-canvas]')).opacity) === 1, undefined, { timeout: 8000 });
 				await page.waitForTimeout(300);
 				const t0 = Date.now();
 				await page.mouse.click(640, 400);
@@ -1308,7 +1383,7 @@ try {
 				const page = await ctx.newPage();
 				anexarColetaConsole(page, 'reg-t5-pular-pos', consoleMensagens);
 				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
-				await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-splash-svg-final]')).display !== 'none', undefined, { timeout: 5000 });
+				await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-splash-svg-final]')).display !== 'none', undefined, { timeout: 9000 });
 				const t0 = Date.now();
 				await page.mouse.click(640, 400);
 				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 2000 });
@@ -1322,7 +1397,7 @@ try {
 				const page = await ctx.newPage();
 				anexarColetaConsole(page, 'reg-t5-esc', consoleMensagens);
 				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
-				await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('[data-splash-canvas]')).opacity) === 1, undefined, { timeout: 3000 });
+				await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('[data-splash-canvas]')).opacity) === 1, undefined, { timeout: 8000 });
 				const t0 = Date.now();
 				await page.keyboard.press('Escape');
 				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 2500 });
@@ -1441,8 +1516,549 @@ try {
 			console.log(`  regressão T5: ${aprovados}/11 OK`);
 		}
 
-		// Monta folha-contato.png
-		const folhaPath = await gerarFolhaContatoT6(outDir, tabelaEnquadramento, capturasPorVp);
+		// === 10. T6 Rodada 2: Barra de carregamento, cache frio 3G, reload/bfcache, rápido, lento, falha/10s, pular e capturas ===
+		console.log(`[T6 rodada ${rodada}] 10/10 Testando barra de carregamento, cache frio 3G, reload/bfcache, lento, 10s e capturas...`);
+		const capturasBarraPorVp = {};
+		{
+			// 10.1 Primeira visita com cache frio em 390×844 dpr 3 (Fast 3G e Slow 3G + CPU 4×)
+			const testarRedeFria = async (id, netCond) => {
+				const ctx = await browser.newContext({
+					viewport: { width: 390, height: 844 },
+					deviceScaleFactor: 3,
+					isMobile: true,
+					hasTouch: true,
+				});
+				const page = await ctx.newPage();
+				anexarColetaConsole(page, `cache-frio-${id}`, consoleMensagens);
+				const cdp = await ctx.newCDPSession(page);
+				await cdp.send('Network.enable');
+				await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
+				await cdp.send('Network.emulateNetworkConditions', netCond);
+				await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+				await page.addInitScript(() => {
+					window.__redeMon = {
+						splashApareceu: false,
+						barraApareceu: false,
+						barraChegou100: false,
+						canvas3dVisivel: false,
+						svgFinalVoou: false,
+						logoReservaApareceu: false,
+						tBarraIni: null,
+						tBarraFim: null,
+						maxPct: 0,
+					};
+					const vigiar = () => {
+						const m = window.__redeMon;
+						if (document.documentElement.classList.contains('splash-ativa')) m.splashApareceu = true;
+						const barra = document.querySelector('[data-splash-barra]');
+						if (barra) {
+							const vis = barra.dataset.barraVisivel === '1';
+							const pct = Number(barra.dataset.barraPct || '0');
+							if (pct > m.maxPct) m.maxPct = pct;
+							if (vis) {
+								if (!m.barraApareceu) {
+									m.barraApareceu = true;
+									m.tBarraIni = performance.now();
+								}
+								if (pct === 100) m.barraChegou100 = true;
+							} else if (m.barraApareceu && m.tBarraFim === null) {
+								m.tBarraFim = performance.now();
+							}
+						}
+						const canvas = document.querySelector('[data-splash-canvas]');
+						if (canvas && Number(getComputedStyle(canvas).opacity) > 0.9) m.canvas3dVisivel = true;
+						const svgF = document.querySelector('[data-splash-svg-final]');
+						if (svgF && getComputedStyle(svgF).display !== 'none') m.svgFinalVoou = true;
+						const logo = document.querySelector('[data-splash-logo]');
+						if (logo && getComputedStyle(logo).visibility === 'visible') m.logoReservaApareceu = true;
+
+						if (document.querySelector('[data-splash-overlay]') || document.documentElement.classList.contains('splash-ativa')) {
+							requestAnimationFrame(vigiar);
+						}
+					};
+					requestAnimationFrame(vigiar);
+				});
+
+				const tWall0 = Date.now();
+				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+				await page.waitForFunction(
+					() => !document.querySelector('[data-splash-overlay]') && !document.documentElement.classList.contains('splash-ativa'),
+					undefined,
+					{ timeout: 30000 },
+				);
+				const wallTotalMs = Date.now() - tWall0;
+				const dados = await page.evaluate(() => {
+					const est = window.__wrSplashEstado ?? null;
+					const m = window.__redeMon;
+					const alvo = document.querySelector('[data-splash-alvo]');
+					return {
+						...m,
+						estado: est,
+						alvoVisivel: alvo ? getComputedStyle(alvo).visibility === 'visible' : false,
+					};
+				});
+				await ctx.close();
+
+				const barraChegou100Real =
+					dados.barraChegou100 ||
+					dados.maxPct === 100 ||
+					dados.estado?.barraMetricas?.porcentagemAtual === 100;
+				const tempoBarraMs =
+					dados.estado?.barraMetricas?.duracaoVisivelMs ??
+					(dados.tBarraIni !== null && dados.tBarraFim !== null
+						? Number((dados.tBarraFim - dados.tBarraIni).toFixed(1))
+						: null);
+				const semFallback = !dados.logoReservaApareceu && dados.estado?.usouFallback === false;
+				const ok =
+					dados.splashApareceu &&
+					dados.barraApareceu &&
+					barraChegou100Real &&
+					dados.canvas3dVisivel &&
+					dados.svgFinalVoou &&
+					semFallback &&
+					dados.alvoVisivel &&
+					tempoBarraMs !== null &&
+					tempoBarraMs >= 500;
+
+				return {
+					ok,
+					tempoBarraMs,
+					tempoCarregamentoMs: dados.estado?.tempoCarregamentoMs ?? null,
+					tempoAnimacaoInicioMs: dados.estado?.tempoAnimacaoInicioMs ?? null,
+					tempoTotalSplashMs: dados.estado?.tempoTotalMs ?? wallTotalMs,
+					wallTotalMs,
+					splashApareceu: dados.splashApareceu,
+					barraApareceu: dados.barraApareceu,
+					barraChegou100: barraChegou100Real,
+					canvas3dVisivel: dados.canvas3dVisivel,
+					svgFinalVoou: dados.svgFinalVoou,
+					semFallback,
+					alvoVisivel: dados.alvoVisivel,
+				};
+			};
+
+			const fast3g = await testarRedeFria('fast3g', {
+				offline: false,
+				latency: 150,
+				downloadThroughput: (1.6 * 1024 * 1024) / 8,
+				uploadThroughput: (750 * 1024) / 8,
+			});
+			const slow3g = await testarRedeFria('slow3g', {
+				offline: false,
+				latency: 400,
+				downloadThroughput: (400 * 1024) / 8,
+				uploadThroughput: (400 * 1024) / 8,
+			});
+			console.log(
+				`  cache frio Fast 3G (4×): barra=${fast3g.tempoBarraMs}ms · total=${fast3g.wallTotalMs}ms · 3D=${fast3g.canvas3dVisivel && fast3g.svgFinalVoou} · fallback=${!fast3g.semFallback} (${fast3g.ok ? 'OK' : 'FALHOU'})`,
+			);
+			console.log(
+				`  cache frio Slow 3G (4×): barra=${slow3g.tempoBarraMs}ms · total=${slow3g.wallTotalMs}ms · 3D=${slow3g.canvas3dVisivel && slow3g.svgFinalVoou} · fallback=${!slow3g.semFallback} (${slow3g.ok ? 'OK' : 'FALHOU'})`,
+			);
+
+			// 10.2 Reload (splash toca de novo) + Voltar pelo histórico via bfcache (não repete)
+			let reloadEBfcache;
+			{
+				const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+				const page = await ctx.newPage();
+				anexarColetaConsole(page, 'reload-e-bfcache', consoleMensagens);
+
+				// Primeira carga
+				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
+				const carga1Ativa = await page.evaluate(() => document.documentElement.classList.contains('splash-ativa'));
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
+				const semSessionStorage = await page.evaluate(() => sessionStorage.getItem('wr-splash-vista') === null);
+
+				// Reload: splash toca de novo
+				await page.reload({ waitUntil: 'domcontentloaded' });
+				const reloadAtiva = await page.evaluate(() => document.documentElement.classList.contains('splash-ativa'));
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
+				const reload3dOk = await page.evaluate(() => window.__wrSplashEstado?.fase === 'finalizada' && window.__wrSplashEstado?.usouFallback === false);
+
+				// Prepara listener de pageshow antes de navegar para /prototipo-t1
+				await page.evaluate(() => {
+					window.__bfLog = [];
+					window.addEventListener('pageshow', (e) => {
+						window.__bfLog.push({
+							persisted: e.persisted,
+							splashAtiva: document.documentElement.classList.contains('splash-ativa'),
+							overlayExiste: Boolean(document.querySelector('[data-splash-overlay]')),
+						});
+					});
+					const link = document.createElement('a');
+					link.id = 'wr-link-bfcache';
+					link.href = '/prototipo-t1/';
+					link.textContent = 'Ir para T1';
+					document.body.appendChild(link);
+				});
+				await Promise.all([
+					page.waitForURL('**/prototipo-t1/**'),
+					page.click('#wr-link-bfcache'),
+				]);
+				await page.waitForLoadState('load');
+
+				// Voltar pelo histórico (bfcache: não dispara 'load', só 'pageshow' com persisted=true)
+				await page.goBack({ waitUntil: 'commit', timeout: 8000 });
+				await page.waitForTimeout(300);
+				const bfDados = await page.evaluate(() => ({
+					url: location.pathname,
+					log: window.__bfLog ?? [],
+					splashAtiva: document.documentElement.classList.contains('splash-ativa'),
+					overlayExiste: Boolean(document.querySelector('[data-splash-overlay]')),
+				}));
+				await ctx.close();
+
+				const bfPersisted = Array.isArray(bfDados.log) && bfDados.log.some((e) => e.persisted === true);
+				const bfSemRepetir =
+					bfPersisted &&
+					!bfDados.splashAtiva &&
+					!bfDados.overlayExiste &&
+					bfDados.log.every((e) => !e.splashAtiva && !e.overlayExiste);
+
+				reloadEBfcache = {
+					ok: carga1Ativa && semSessionStorage && reloadAtiva && reload3dOk && bfSemRepetir,
+					carga1Ativa,
+					semSessionStorage,
+					reloadAtiva,
+					reload3dOk,
+					bfcachePersisted: bfPersisted,
+					bfcacheNaoRepetiu: bfSemRepetir,
+					bfLog: bfDados.log,
+				};
+				console.log(
+					`  reload/bfcache: semSession=${semSessionStorage} · reload=${reloadAtiva && reload3dOk} · bfcachePersisted=${bfPersisted} · naoRepetiu=${bfSemRepetir} (${reloadEBfcache.ok ? 'OK' : 'FALHOU'})`,
+				);
+			}
+
+			// 10.3 Carregamento rápido (cache quente, sem throttle): barra não aparece ou fica >= 500 ms (nunca pisca)
+			let carregamentoRapido;
+			{
+				const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+				const page = await ctx.newPage();
+				anexarColetaConsole(page, 'carregamento-rapido', consoleMensagens);
+				// Aquece o cache HTTP
+				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
+
+				// Mede no carregamento quente
+				await page.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
+				const estQuente = await page.evaluate(() => window.__wrSplashEstado ?? null);
+				await ctx.close();
+
+				const barraExibida = Boolean(estQuente?.barraExibida);
+				const durBarraMs = estQuente?.barraMetricas?.duracaoVisivelMs ?? null;
+				const semPiscar = !barraExibida || (durBarraMs !== null && durBarraMs >= 500);
+				carregamentoRapido = {
+					ok: semPiscar && estQuente?.fase === 'finalizada' && estQuente?.usouFallback === false,
+					barraExibida,
+					duracaoBarraVisivelMs: durBarraMs,
+					tempoCarregamentoMs: estQuente?.tempoCarregamentoMs ?? null,
+					semPiscar,
+				};
+				console.log(
+					`  carregamento rápido (cache quente): barraExibida=${barraExibida} · durBarra=${durBarraMs ?? 0}ms · carreg=${carregamentoRapido.tempoCarregamentoMs}ms (${carregamentoRapido.ok ? 'OK' : 'FALHOU'})`,
+				);
+			}
+
+			// 10.4 ?splash=lento: barra visível, progresso monotônico amostrado por quadro, depois animação 3D (+ ?splash=forcar aceito)
+			let splashLentoMonotonico;
+			{
+				const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+				const page = await ctx.newPage();
+				anexarColetaConsole(page, 'splash-lento-monotonico', consoleMensagens);
+				await page.addInitScript(() => {
+					window.__amostrasBarra = [];
+					const amostrar = () => {
+						const b = document.querySelector('[data-splash-barra]');
+						if (b && b.dataset.barraVisivel === '1') {
+							window.__amostrasBarra.push({
+								t: Number(performance.now().toFixed(1)),
+								progresso: Number(b.dataset.barraProgresso || '0'),
+								pct: Number(b.dataset.barraPct || '0'),
+								fase: b.dataset.barraFase || '',
+							});
+						}
+						if (document.querySelector('[data-splash-overlay]')) {
+							requestAnimationFrame(amostrar);
+						}
+					};
+					requestAnimationFrame(amostrar);
+				});
+
+				await page.goto(`${URL_BASE}/?splash=lento`, { waitUntil: 'domcontentloaded' });
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 15000 });
+				const dadosLento = await page.evaluate(() => ({
+					amostras: window.__amostrasBarra ?? [],
+					estado: window.__wrSplashEstado ?? null,
+				}));
+
+				// Confere ?splash=forcar aceito sem efeito/erro
+				await page.goto(`${URL_BASE}/?splash=forcar`, { waitUntil: 'domcontentloaded' });
+				await page.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 10000 });
+				const forcarOk = await page.evaluate(() => window.__wrSplashEstado?.fase === 'finalizada' && window.__wrSplashEstado?.usouFallback === false);
+				await ctx.close();
+
+				const am = dadosLento.amostras;
+				let quedasProgresso = 0;
+				let quedasPct = 0;
+				for (let i = 1; i < am.length; i++) {
+					if (am[i].progresso < am[i - 1].progresso - 1e-6) quedasProgresso++;
+					if (am[i].pct < am[i - 1].pct) quedasPct++;
+				}
+				const maxPct = am.reduce((acc, a) => Math.max(acc, a.pct), 0);
+				const chegou100 = maxPct === 100 || dadosLento.estado?.barraMetricas?.porcentagemAtual === 100;
+				const ok =
+					am.length >= 20 &&
+					quedasProgresso === 0 &&
+					quedasPct === 0 &&
+					chegou100 &&
+					dadosLento.estado?.barraExibida === true &&
+					dadosLento.estado?.usouFallback === false &&
+					dadosLento.estado?.fase === 'finalizada' &&
+					forcarOk;
+
+				splashLentoMonotonico = {
+					ok,
+					quadrosAmostrados: am.length,
+					quedasProgresso,
+					quedasPct,
+					primeiroPct: am[0]?.pct ?? null,
+					ultimoPct: am[am.length - 1]?.pct ?? null,
+					chegou100,
+					duracaoBarraVisivelMs: dadosLento.estado?.barraMetricas?.duracaoVisivelMs ?? null,
+					tempoTotalMs: dadosLento.estado?.tempoTotalMs ?? null,
+					forcarAceitoOk: forcarOk,
+				};
+				console.log(
+					`  ?splash=lento: quadros=${am.length} · quedas=${quedasProgresso}/${quedasPct} · 100%=${chegou100} · forcar=${forcarOk} (${splashLentoMonotonico.ok ? 'OK' : 'FALHOU'})`,
+				);
+			}
+
+			// 10.5 ?splash=falha + limite de 10 s simulado (a barra some, entra fallback, página utilizável)
+			let falhaELimite10s;
+			{
+				// 10.5a ?splash=falha
+				const ctxF = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+				const pageF = await ctxF.newPage();
+				anexarColetaConsole(pageF, 'falha-com-barra', consoleMensagens);
+				await pageF.goto(`${URL_BASE}/?splash=falha`, { waitUntil: 'domcontentloaded' });
+				await pageF.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 5000 });
+				const resFalha = await pageF.evaluate(() => ({
+					estado: window.__wrSplashEstado ?? null,
+					alvoVisivel: getComputedStyle(document.querySelector('[data-splash-alvo]')).visibility === 'visible',
+					splashAtiva: document.documentElement.classList.contains('splash-ativa'),
+				}));
+				await ctxF.close();
+
+				// 10.5b Limite de 10 s simulado segurando o chunk animacao*.js
+				const ctx10 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+				const page10 = await ctx10.newPage();
+				anexarColetaConsole(page10, 'limite-10s-simulado', consoleMensagens);
+				let liberarRota3d = null;
+				await page10.route('**/*animacao*.js', async (route) => {
+					await new Promise((resolve) => {
+						liberarRota3d = resolve;
+					});
+					try {
+						await route.continue();
+					} catch {
+						// página já encerrada
+					}
+				});
+
+				await page10.addInitScript(() => {
+					window.__lim10 = { barraApareceu: false, maxPct: 0, barraSumiuAntesFim: false };
+					const tick = () => {
+						const b = document.querySelector('[data-splash-barra]');
+						if (b) {
+							const vis = b.dataset.barraVisivel === '1';
+							const pct = Number(b.dataset.barraPct || '0');
+							if (pct > window.__lim10.maxPct) window.__lim10.maxPct = pct;
+							if (vis) window.__lim10.barraApareceu = true;
+							else if (window.__lim10.barraApareceu) window.__lim10.barraSumiuAntesFim = true;
+						}
+						if (document.querySelector('[data-splash-overlay]')) {
+							requestAnimationFrame(tick);
+						}
+					};
+					requestAnimationFrame(tick);
+				});
+
+				const t10Ini = Date.now();
+				await page10.goto(`${URL_BASE}/`, { waitUntil: 'domcontentloaded' });
+				await page10.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 15000 });
+				const dur10Ms = Date.now() - t10Ini;
+				const res10 = await page10.evaluate(() => ({
+					mon: window.__lim10,
+					estado: window.__wrSplashEstado ?? null,
+					alvoVisivel: getComputedStyle(document.querySelector('[data-splash-alvo]')).visibility === 'visible',
+					splashAtiva: document.documentElement.classList.contains('splash-ativa'),
+				}));
+				if (liberarRota3d) liberarRota3d();
+				await ctx10.close();
+
+				const okFalha =
+					resFalha.estado?.usouFallback === true &&
+					resFalha.estado?.motivoFallback === 'erro' &&
+					resFalha.alvoVisivel &&
+					!resFalha.splashAtiva;
+				const ok10s =
+					res10.mon.barraApareceu &&
+					res10.mon.maxPct < 100 &&
+					res10.mon.barraSumiuAntesFim &&
+					res10.estado?.usouFallback === true &&
+					res10.estado?.motivoFallback === 'timeout-10s' &&
+					dur10Ms >= 9800 &&
+					dur10Ms <= 13500 &&
+					res10.alvoVisivel &&
+					!res10.splashAtiva;
+
+				falhaELimite10s = {
+					ok: okFalha && ok10s,
+					splashFalha: { ok: okFalha, motivo: resFalha.estado?.motivoFallback ?? null },
+					limite10s: {
+						ok: ok10s,
+						duracaoMs: dur10Ms,
+						barraApareceu: res10.mon.barraApareceu,
+						maxPctAntesFallback: res10.mon.maxPct,
+						barraSumiuAntesFim: res10.mon.barraSumiuAntesFim,
+						motivo: res10.estado?.motivoFallback ?? null,
+					},
+				};
+				console.log(
+					`  falha/10s: ?splash=falha=${okFalha ? 'OK' : 'FALHOU'} · limite10s=${ok10s ? 'OK' : 'FALHOU'} (${dur10Ms}ms, maxPct=${res10.mon.maxPct}%)`,
+				);
+			}
+
+			// 10.6 Pular durante a barra (toque celular + teclado desktop)
+			let pularDuranteBarra;
+			{
+				// Celular 390×844 dpr 3 (toque)
+				const ctxM = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+				const pageM = await ctxM.newPage();
+				anexarColetaConsole(pageM, 'pular-barra-mobile', consoleMensagens);
+				await pageM.addInitScript(() => {
+					window.__logoReservaViu = false;
+					window.__cliquesFantasmaBarra = 0;
+					document.addEventListener('click', (e) => {
+						const t = e.target;
+						if (t instanceof Element && t.closest('a, button')) {
+							e.preventDefault();
+							window.__cliquesFantasmaBarra++;
+						}
+					}, false);
+					const obs = () => {
+						const l = document.querySelector('[data-splash-logo]');
+						if (l && getComputedStyle(l).visibility === 'visible') window.__logoReservaViu = true;
+						if (document.querySelector('[data-splash-overlay]')) requestAnimationFrame(obs);
+					};
+					requestAnimationFrame(obs);
+				});
+				await pageM.goto(`${URL_BASE}/?splash=lento`, { waitUntil: 'domcontentloaded' });
+				await pageM.waitForFunction(() => document.querySelector('[data-splash-barra]')?.dataset.barraVisivel === '1', undefined, { timeout: 5000 });
+				await pageM.waitForTimeout(200);
+				const alvoPos = await pageM.evaluate(() => {
+					const r = document.querySelector('header a').getBoundingClientRect();
+					return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+				});
+				const tTap0 = Date.now();
+				await pageM.touchscreen.tap(alvoPos.x, alvoPos.y);
+				await pageM.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 2500 });
+				const durPularMobMs = Date.now() - tTap0;
+				await pageM.waitForTimeout(250);
+				const mobRes = await pageM.evaluate(() => ({
+					logoReservaViu: window.__logoReservaViu,
+					cliquesFantasma: window.__cliquesFantasmaBarra,
+					alvoVisivel: getComputedStyle(document.querySelector('[data-splash-alvo]')).visibility === 'visible',
+				}));
+				await ctxM.close();
+
+				// Desktop 1280×800 (tecla Escape)
+				const ctxD = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+				const pageD = await ctxD.newPage();
+				anexarColetaConsole(pageD, 'pular-barra-desktop', consoleMensagens);
+				await pageD.addInitScript(() => {
+					window.__logoReservaViuD = false;
+					const obs = () => {
+						const l = document.querySelector('[data-splash-logo]');
+						if (l && getComputedStyle(l).visibility === 'visible') window.__logoReservaViuD = true;
+						if (document.querySelector('[data-splash-overlay]')) requestAnimationFrame(obs);
+					};
+					requestAnimationFrame(obs);
+				});
+				await pageD.goto(`${URL_BASE}/?splash=lento`, { waitUntil: 'domcontentloaded' });
+				await pageD.waitForFunction(() => document.querySelector('[data-splash-barra]')?.dataset.barraVisivel === '1', undefined, { timeout: 5000 });
+				await pageD.waitForTimeout(200);
+				const tKey0 = Date.now();
+				await pageD.keyboard.press('Escape');
+				await pageD.waitForFunction(() => !document.querySelector('[data-splash-overlay]'), undefined, { timeout: 2500 });
+				const durPularDeskMs = Date.now() - tKey0;
+				const deskRes = await pageD.evaluate(() => ({
+					logoReservaViu: window.__logoReservaViuD,
+					alvoVisivel: getComputedStyle(document.querySelector('[data-splash-alvo]')).visibility === 'visible',
+				}));
+				await ctxD.close();
+
+				const okMob = durPularMobMs < 1000 && !mobRes.logoReservaViu && mobRes.cliquesFantasma === 0 && mobRes.alvoVisivel;
+				const okDesk = durPularDeskMs < 1000 && !deskRes.logoReservaViu && deskRes.alvoVisivel;
+				pularDuranteBarra = {
+					ok: okMob && okDesk,
+					mobileToque: { ok: okMob, duracaoMs: durPularMobMs, ...mobRes },
+					desktopEsc: { ok: okDesk, duracaoMs: durPularDeskMs, ...deskRes },
+				};
+				console.log(
+					`  pular durante barra: mobile=${durPularMobMs}ms (fantasma=${mobRes.cliquesFantasma}) · desktop=${durPularDeskMs}ms (${pularDuranteBarra.ok ? 'OK' : 'FALHOU'})`,
+				);
+			}
+
+			// 10.7 Capturas da barra (~10%, 50%, 90%, 100%, fade de saída, 1º quadro da animação) em 390×844 e 1280×800
+			const arquivosCapturasBarra = {};
+			for (const vp of VIEWPORTS_BARRA) {
+				const ctx = await browser.newContext({
+					viewport: { width: vp.width, height: vp.height },
+					deviceScaleFactor: vp.dpr,
+					isMobile: vp.isMobile,
+					hasTouch: vp.hasTouch,
+				});
+				const page = await ctx.newPage();
+				anexarColetaConsole(page, `captura-barra-${vp.id}`, consoleMensagens);
+				capturasBarraPorVp[vp.id] = {};
+				arquivosCapturasBarra[vp.id] = {};
+				for (const est of ESTADOS_CAPTURA_BARRA) {
+					await page.goto(`${URL_BASE}${est.url}`, { waitUntil: 'networkidle' });
+					await page.waitForFunction(() => document.documentElement.dataset.capturaPronta === '1', undefined, { timeout: 15000 });
+					const arq = path.join(capturasDir, `barra-${vp.id}-${est.id}.png`);
+					await page.screenshot({ path: arq });
+					capturasBarraPorVp[vp.id][est.id] = arq;
+					arquivosCapturasBarra[vp.id][est.id] = path.relative(ROOT_DIR, arq).replace(/\\/g, '/');
+				}
+				await ctx.close();
+			}
+
+			barraECarregamentoResumo = {
+				ok:
+					fast3g.ok &&
+					slow3g.ok &&
+					reloadEBfcache.ok &&
+					carregamentoRapido.ok &&
+					splashLentoMonotonico.ok &&
+					falhaELimite10s.ok &&
+					pularDuranteBarra.ok,
+				cacheFrioFast3g: fast3g,
+				cacheFrioSlow3g: slow3g,
+				reloadEBfcache,
+				carregamentoRapido,
+				splashLentoMonotonico,
+				falhaELimite10s,
+				pularDuranteBarra,
+				capturasBarra: arquivosCapturasBarra,
+			};
+		}
+
+		// Monta folha-contato.png (incluindo capturas da barra em 390×844 e 1280×800)
+		const folhaPath = await gerarFolhaContatoT6(outDir, tabelaEnquadramento, capturasPorVp, capturasBarraPorVp);
 		folhaPathRel = path.relative(ROOT_DIR, folhaPath).replace(/\\/g, '/');
 		console.log(`  salvo: ${folhaPathRel}`);
 	} finally {
@@ -1481,6 +2097,7 @@ const metricas = {
 	desempenhoCelular: desempenhoCelularResumo,
 	reduzidoEFallbackCelular: reduzidoEFallbackCelularResumo,
 	regressaoT5: regressaoT5Resumo,
+	barraECarregamento: barraECarregamentoResumo,
 	evidencias: {
 		folhaContato: folhaPathRel,
 	},
@@ -1513,6 +2130,7 @@ const tudoOk =
 	desempenhoCelularResumo?.ok === true &&
 	reduzidoEFallbackCelularResumo?.ok === true &&
 	regressaoT5Resumo?.ok === true &&
+	barraECarregamentoResumo?.ok === true &&
 	totalErrosConsole === 0 &&
 	totalAvisosConsole === 0;
 
