@@ -1,6 +1,10 @@
 ---
 import refJpg from '../../75bd2ea1-dad6-4791-aad9-9eb8a08a2b09.jpg';
+import { CORES, ESPESSURA_LINHA_CONSTRUCAO_1024_PX } from '../scripts/splash/cena/constantes';
+import { gerarPathAsterisco2D } from '../scripts/splash/cena/linhas/construcao';
 import { LOGO_SVG } from '../scripts/splash/logo';
+
+const ASTERISCO_BARRA_D = gerarPathAsterisco2D(6.5);
 ---
 
 <div
@@ -16,6 +20,70 @@ import { LOGO_SVG } from '../scripts/splash/logo';
 		class="pointer-events-none relative z-10 block aspect-square w-full max-w-[100dvh] [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
 	>
 		<Fragment set:html={LOGO_SVG} />
+	</div>
+	<div
+		data-splash-barra
+		data-barra-progresso="0.00"
+		data-barra-pct="0"
+		data-barra-visivel="0"
+		data-barra-fase="oculta"
+		role="progressbar"
+		aria-label="Carregando"
+		aria-valuemin="0"
+		aria-valuemax="100"
+		aria-valuenow="0"
+		class="pointer-events-none absolute inset-0 z-25 flex flex-col items-center justify-center"
+	>
+		<div class="relative h-[18px] w-[min(240px,50vw)]">
+			<div
+				data-barra-trilho
+				class="absolute inset-x-0"
+				style={`top:calc(50% - 0.575px);height:${ESPESSURA_LINHA_CONSTRUCAO_1024_PX}px;background:${CORES.linhaConstrucao};`}
+			></div>
+			<div
+				data-barra-preenchimento
+				class="absolute left-0 w-full origin-left bg-carbono"
+				style="top:calc(50% - 1px);height:2px;transform:scaleX(0);"
+			></div>
+			<svg
+				data-barra-asterisco="esq"
+				width="16"
+				height="16"
+				viewBox="-8 -8 16 16"
+				aria-hidden="true"
+				shape-rendering="geometricPrecision"
+				class="pointer-events-none absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 overflow-visible"
+			>
+				<path
+					d={ASTERISCO_BARRA_D}
+					fill="none"
+					stroke={CORES.linhaConstrucao}
+					stroke-width={ESPESSURA_LINHA_CONSTRUCAO_1024_PX}
+					stroke-linecap="butt"
+				/>
+			</svg>
+			<svg
+				data-barra-asterisco="dir"
+				width="16"
+				height="16"
+				viewBox="-8 -8 16 16"
+				aria-hidden="true"
+				shape-rendering="geometricPrecision"
+				class="pointer-events-none absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 overflow-visible"
+			>
+				<path
+					d={ASTERISCO_BARRA_D}
+					fill="none"
+					stroke={CORES.linhaConstrucao}
+					stroke-width={ESPESSURA_LINHA_CONSTRUCAO_1024_PX}
+					stroke-linecap="butt"
+				/>
+			</svg>
+		</div>
+		<div class="mt-3 flex w-[min(240px,50vw)] items-baseline justify-between text-[11px] leading-none tracking-[0.04em] text-[#767672]">
+			<span>carregando</span>
+			<span data-barra-porcentagem class="tabular-nums">0%</span>
+		</div>
 	</div>
 	<canvas
 		data-splash-canvas

@@ -503,7 +503,7 @@ export function criarAnimacaoControlavel(
 		}
 	};
 
-	const recalcularLayout = (): void => {
+	const recalcularLayout = (renderizar = true): void => {
 		if (destruida) return;
 
 		// Dimensiona canvas, HLR e SVG final pelo tamanho real do container (nunca por window.innerWidth)
@@ -601,7 +601,9 @@ export function criarAnimacaoControlavel(
 		renderer.setSize(w, h, false);
 		atualizarEnquadramentoCamera(camera, w, h, escalaEnquadramento);
 		linhas.definirDimensoes(w, h);
-		renderizarQuadro(false);
+		if (renderizar) {
+			renderizarQuadro(false);
+		}
 	};
 
 	// --- Timeline GSAP determinística (0..2,60 s intactos; 2,60..3,10 s voo SVG + fades) ---
@@ -774,9 +776,27 @@ export function criarAnimacaoControlavel(
 	window.addEventListener('orientationchange', agendarResize);
 	window.visualViewport?.addEventListener('resize', agendarResize);
 
-	// Inicializa no quadro t = 0
+	// Aquece o pipeline WebGL (compila shaders de todas as peças + shadow map em uma única
+	// passagem) enquanto o canvas ainda está oculto (`opacity: 0`), evitando travadas no 1º impacto.
+	const aquecerShaders = (): void => {
+		pecas.w.visible = true;
+		pecas.r.visible = true;
+		pecas.quarto.visible = true;
+		if (meshRSolido) meshRSolido.visible = true;
+		if (meshRCorpo) meshRCorpo.visible = true;
+		if (meshRLamina) meshRLamina.visible = true;
+		raizCubo.position.set(0, 0, 0);
+		raizCubo.scale.set(1, 1, 1);
+		raizCubo.updateMatrixWorld(true);
+		atualizarSombra(0, 0);
+		renderer.render(scene, camera);
+	};
+
+	// Inicializa dimensões sem renderizar t=0 redundante, aquece shaders e restaura t=0 limpo
 	timeline.pause(0);
-	recalcularLayout();
+	recalcularLayout(false);
+	aquecerShaders();
+	renderizarQuadro(false);
 
 	const seek = (tempoSeg: number): void => {
 		if (destruida) return;

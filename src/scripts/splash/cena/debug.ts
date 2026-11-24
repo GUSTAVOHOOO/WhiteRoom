@@ -4,6 +4,7 @@ import {
 	DURACAO_SPLASH_S,
 	type TelemetriaPosePecas,
 } from '../animacao';
+import { aplicarVisualBarraNoDom, type FaseBarra } from '../barra';
 import { atualizarEnquadramentoCamera } from './camera';
 import { REFERENCIA_PX } from './constantes';
 import { criarCena, type CenaCubo } from './cubo';
@@ -601,10 +602,43 @@ function iniciarModoExportSvg(elementos: ElementosDebugSplash): void {
  * - `/?debug=t4` / `/?debug=t4&t=<seg>`: animação real T4 em loop ou captura determinística.
  * - `/?debug=export-svg`: exportação da pose final (HLR 1024 + render 4096 transparente).
  */
+function iniciarModoBarra(elementos: ElementosDebugSplash): void {
+	const { overlayEl, fundoEl, logoEl, canvasEl, linhasEl, svgFinalEl } = elementos;
+	const barraEl = overlayEl.querySelector<HTMLElement>('[data-splash-barra]');
+	if (!barraEl) return;
+
+	logoEl.style.display = 'none';
+	if (svgFinalEl) svgFinalEl.style.display = 'none';
+	canvasEl.style.opacity = '0';
+	linhasEl.style.display = 'none';
+	fundoEl.style.opacity = '1';
+
+	const params = new URLSearchParams(window.location.search);
+	const pNum = Number(params.get('p') ?? '50');
+	const opNum = Number(params.get('opacidade') ?? '1');
+	const faseParam = (params.get('fase') ?? 'visivel') as FaseBarra;
+	const p = Number.isFinite(pNum) ? Math.max(0, Math.min(100, pNum)) : 50;
+	const op = Number.isFinite(opNum) ? Math.max(0, Math.min(1, opNum)) : 1;
+
+	barraEl.style.visibility = 'visible';
+	barraEl.style.opacity = String(op);
+	aplicarVisualBarraNoDom(barraEl, p, Math.round(p), faseParam, op > 0);
+
+	window.requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => {
+			document.documentElement.dataset.capturaPronta = '1';
+		});
+	});
+}
+
 export function iniciarModoDebug(
 	elementos: ElementosDebugSplash,
 	modoDebug: string,
 ): void {
+	if (modoDebug === 'barra') {
+		iniciarModoBarra(elementos);
+		return;
+	}
 	if (modoDebug === 't4') {
 		iniciarModoT4(elementos);
 		return;

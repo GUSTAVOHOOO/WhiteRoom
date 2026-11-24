@@ -46,6 +46,11 @@ html.splash-ativa [data-splash-alvo] {
 	visibility: hidden;
 }
 
-html.splash-reduzida #wr-splash [data-splash-logo] {
+html.splash-reduzida.splash-reduzida-pronta #wr-splash [data-splash-logo] {
 	visibility: visible;
+}
+
+#wr-splash [data-splash-barra] {
+	visibility: hidden;
+	opacity: 0;
 }
