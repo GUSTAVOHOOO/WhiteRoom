@@ -1,4 +1,4 @@
-# T4 — Estado do Gauntlet Loop (Passagem de Bastão → Rodada 2)
+# T4 — Estado do Gauntlet Loop (Passagem de Bastão → Rodada 3)
 
 Branch: `GUSTAVOHOOO/splash-t4-animacao` · Base: `aa97cc5 docs: capturas de referencia do prototipo T0`.
 Nenhuma dependência nova foi adicionada ao `package.json` da raiz.
@@ -12,9 +12,9 @@ Perfis SVG (`src/assets/logo/perfis/*.svg`), geometria/cores das faces (`pecas.t
 | `src/scripts/splash/animacao.ts` | Substituiu o stub 2D pela animação 3D real (`criarAnimacao` e `criarAnimacaoControlavel`) usando `criarCena` da T2 + HLR vetorial em SVG + **uma única timeline GSAP determinística** (`DURACAO_SPLASH_S = 3.1`). |
 | `src/scripts/splash/controlador.ts` | Passa `{ svgLinhas, container: overlayEl }` para `criarAnimacao`, exibe `<svg data-splash-linhas>` ao ativar o 3D (e esconde no fallback), repassa `alvoEl` para `iniciarModoDebug` e evita fade duplicado quando `pular()` interrompe `tocar()`. Todas as garantias da T3 preservadas (`sessionStorage`, skip por clique/toque/Esc/Enter/Espaço, movimento reduzido, timeout 800 ms, rede 3 s, teto 8 s, `?splash=travado`, fade do fundo após `tocar()` reservado para T5). |
 | `src/scripts/splash/cena/cubo.ts` | Expõe `luz: LuzCena` em `CenaCubo` (aditivo, retrocompatível com T2) para o rastreamento do frustum de sombra durante a animação. |
-| `src/scripts/splash/cena/linhas/{tipos,construcao,visibilidade,encadear,svg,index}.ts` | Extensão retrocompatível do HLR com `definirEstadoAnimacao(EstadoAnimacaoHlr)`: (1) crescimento das linhas de construção a partir dos 6 asteriscos (`gerarArestasConstrucao(progresso, progressoPonteW)`), (2) pulso radial no impacto (`pulsoConstrucao`), (3) matriz mundo das linhas de construção (`matrizConstrucao`) acompanhando o cubo no voo ao header, (4) descarte automático de malhas ocultas (`objetoVisivelNaCena`) antes de cada peça entrar, (5) escalonamento proporcional das espessuras de traço (`svg.ts`) e tolerâncias 2D/3D (`visibilidade.ts`, `encadear.ts`) por `escalaCubo`, e (6) `updateWorldMatrix(true, true)` + cache de visibilidade/estado em `linhas/index.ts`. Com valores padrão (= pose estática T2), o resultado é **bit-a-bit idêntico à T2**. |
+| `src/scripts/splash/cena/linhas/{tipos,arestas,construcao,visibilidade,encadear,svg,index}.ts` | Extensão retrocompatível do HLR com `definirEstadoAnimacao(EstadoAnimacaoHlr)`: (1) crescimento das linhas de construção a partir dos 6 asteriscos (`gerarArestasConstrucao(progresso, progressoPonteW)`), separando a haste externa `T_left -X` da ponte interna sobre o vão do W (`ehPonteW`), (2) pulso radial no impacto (`pulsoConstrucao`), (3) matriz mundo das linhas de construção (`matrizConstrucao`) acompanhando o cubo no voo ao header, (4) descarte automático de malhas ocultas (`objetoVisivelNaCena`) antes de cada peça entrar, (5) oclusão 2D incondicional das linhas de construção por qualquer face sólida (`PAPEL_OCLUSAO_CONSTRUCAO` pré-classificado em `arestas.ts`), mantendo teste de profundidade 3D apenas para `ehPonteW` sobre `PAREDE_INTERNA_QUARTO` e sobre `CHANFRO_INTERNO_W` quando o W está encaixado (`wPonteAlinhada`), (6) escalonamento proporcional das espessuras de traço (`svg.ts`) e tolerâncias 2D/3D (`visibilidade.ts`, `encadear.ts`) por `escalaCubo`, e (7) `updateWorldMatrix(true, true)` + cache de visibilidade/estado em `linhas/index.ts`. Com valores padrão (= pose estática T2), o resultado é **bit-a-bit idêntico à T2**. |
 | `src/scripts/splash/cena/debug.ts` | Adicionados `/?debug=t4&t=<segundos>` (captura determinística via `seek(t)`, marca `document.documentElement.dataset.capturaPronta = '1'`, sem HUD) e `/?debug=t4` (loop interativo com HUD de tempo/rAF/render/HLR e `window.__wrT4Bench`). Modos da T2 (`/?debug`, `/?debug=captura`, `/?debug=hlr`) preservados intactos. |
-| `tools/gauntlet/t4-rodada.mjs` | Gate completo da T4 (check, build, preview isolado na porta 4403 sempre encerrado no `finally`, capturas desktop/mobile/pose-final, `folha-contato.png`, pixelmatch vs T2 rodada 7, benchmark desktop e mobile, testes de fluxo real em `/` sem debug + regressão T2 + determinismo/resize). |
+| `tools/gauntlet/t4-rodada.mjs` | Gate completo da T4 (check, build, preview isolado na porta 4403 sempre encerrado no `finally`, capturas desktop/movimento/mobile/pose-final, `folha-contato.png`, pixelmatch vs T2 rodada 7, benchmark desktop e mobile, testes de fluxo real em `/` sem debug + regressão T2 + determinismo/resize). |
 
 ## 2. Como rodar o gate e os modos de inspeção
 
@@ -27,10 +27,11 @@ node tools/gauntlet/t4-rodada.mjs <n>
 ```
 
 Saídas em `docs/gauntlet/t4/rodada-<n>/`:
-- Desktop `1280×800` dpr 1: `t-0.30s-desktop.png`, `t-0.70s-desktop.png`, `t-1.25s-desktop.png`, `t-1.90s-desktop.png`, `t-2.60s-desktop.png`, `t-3.10s-desktop.png`
+- Desktop `1280×800` dpr 1 (quadros-chave): `t-0.30s-desktop.png`, `t-0.70s-desktop.png`, `t-1.25s-desktop.png`, `t-1.90s-desktop.png`, `t-2.60s-desktop.png`, `t-3.10s-desktop.png`
+- Desktop `1280×800` dpr 1 (peças em movimento): `t-0.55s-desktop.png`, `t-1.05s-desktop.png`, `t-0.66s-desktop.png`, `t-1.21s-desktop.png`
 - Mobile `390×844` dpr 3: `t-1.90s-mobile.png`, `t-2.60s-mobile.png`
 - Pose final `1024×1024` dpr 1 (`t = 2.4 s` vs `docs/gauntlet/t2/rodada-7/captura.png`): `pose-final-1024.png`, `pose-final-diff.png`
-- Comparativo lado a lado com T0 + linha mobile: `folha-contato.png`
+- Comparativo lado a lado com T0 + linhas de movimento + linha mobile: `folha-contato.png`
 - Métricas estruturadas: `metricas.json`
 
 URLs de depuração (com `astro preview` ou `astro dev`):
@@ -61,6 +62,10 @@ URLs de depuração (com `astro preview` ou `astro dev`):
    - Apenas em `/?debug=t4&t=<seg>` quando a viewport é exatamente `1024×1024`, `debug.ts` força a caixa do overlay para `1024×1024` `dpr 1` (igual ao `/?debug=captura` da T2), permitindo comparação pixel-a-pixel contra `t2/rodada-7/captura.png`.
 6. **Pular (`pular()`)**:
    - Interrompe a timeline, garante todas as peças visíveis e interpola suavemente do estado atual até a pose final no header em `~300 ms` (`power3.inOut`; se já estiver em voo, proporcional ao restante).
+7. **Oclusão 2D das linhas de construção sobre faces sólidas (Rodada 2)**:
+   - Todas as arestas externas/silhueta de construção (`!ehPonteW`) sofrem oclusão 2D incondicional por qualquer triângulo frontal não mascarado (independentemente da profundidade Z), impedindo que arestas fixas ou asteriscos (`±0,723`) risquem peças em movimento, overshoot ou achatamento.
+   - A ponte interna sobre o vão superior do W (`ehPonteW`, `X: -0,5 → +0,5, Y = +0,5, Z = +0,5`) também é ocluída em 2D por todas as faces sólidas (R inteiro, face preta/topos do W, topos brancos do quarto), mas mantém teste de profundidade 3D sobre `PAREDE_INTERNA_QUARTO` (faces verticais internas do quarto) e sobre `CHANFRO_INTERNO_W` (face lateral interna da haste esquerda do W) somente quando `wPonteAlinhada` confirma que a quina superior frontal do W coincide com a ponte (`tol = 0,004 × escalaCubo`).
+   - Preserva `0,0000%` de diff (`0 / 1.048.576 px`) na pose final em `t = 2,4 s` e no modo estático da T2.
 
 ## 4. Armadilhas conhecidas
 
@@ -73,4 +78,13 @@ URLs de depuração (com `astro preview` ou `astro dev`):
 
 | Rodada | Commit | Resumo | Check / Build / Console | Pose final (`t=2.4` vs T2 R7) | Desktop `1280×800` (rAF / Trab / HLR) | Mobile `390×844 dpr 3` (rAF / Trab / HLR) | Fluxo real | Nota crítico |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `603190e` | Animação 3D determinística completa + HLR animado + `/?debug=t4` + `t4-rodada.mjs` + refinamento do hexágono `0,30 s` e overshoot do R `1,25 s` | OK / OK / 0 err, 0 warn | **`0,0000%`** (`0 / 1.048.576 px`) | `13,43` (`p95 14,9`) / `1,68` (`p95 4,3`) / **`1,11 ms`** (`p95 3,7`) | `13,29` (`p95 14,0`) / `1,49` (`p95 3,5`) / **`0,94 ms`** (`p95 2,8`) | 7/7 OK | *(pendente)* |
+| 1 | `603190e` | Animação 3D determinística completa + HLR animado + `/?debug=t4` + `t4-rodada.mjs` + refinamento do hexágono `0,30 s` e overshoot do R `1,25 s` | OK / OK / 0 err, 0 warn | **`0,0000%`** (`0 / 1.048.576 px`) | `13,43` (`p95 14,9`) / `1,68` (`p95 4,3`) / **`1,11 ms`** (`p95 3,7`) | `13,29` (`p95 14,0`) / `1,49` (`p95 3,5`) / **`0,94 ms`** (`p95 2,8`) | 7/7 OK | `FAIL · 6,5` |
+| 2 | `1848214` | Correção da falha nº 1: oclusão 2D das linhas de construção por faces sólidas (`PAPEL_OCLUSAO_CONSTRUCAO` + `ehPonteW` + `wPonteAlinhada`), capturas em movimento (`0,55/1,05/0,66/1,21 s`) e comparativo 3× `linhas-antes-depois.png` | OK / OK / 0 err, 0 warn | **`0,0000%`** (`0 / 1.048.576 px`) | `13,47` (`p95 14,5`) / `1,52` (`p95 3,9`) / **`0,98 ms`** (`p95 3,2`) | `13,28` (`p95 14,5`) / `1,60` (`p95 4,0`) / **`1,01 ms`** (`p95 3,1`) | 7/7 OK | *(pendente)* |
+
+## 6. Passagem de bastão para o próximo construtor
+
+- **Falha nº 1 (resolvida na rodada 2)**: nenhuma linha de construção atravessa face sólida em movimento (`0,55 s`, `0,66 s`, `1,05 s`, `1,21 s`), impactos (`0,70 s`, `1,25 s`, `1,90 s` desktop e mobile) ou queda do quarto, preservando `0,0000%` de diff na pose final (`t = 2,4 s`).
+- **Pendências remanescentes da crítica da rodada 1 (`docs/gauntlet/t4/rodada-1/critica.md`)**:
+  - **Falha nº 2 (pouso no header em `3,10 s`)**: contorno serrilhado/quebrado em `40×40 px` e 6 resquícios subpixel cinza dos asteriscos ao redor. Caminhos sugeridos pelo crítico: fade-out das linhas de construção na segunda metade do voo (`2,60–2,95 s`) e largura mínima legível de contorno (~0,9–1,1 px) em `svg.ts` / `animacao.ts` (lembrando que o fade do fundo `[data-splash-fundo]` continua reservado para a T5).
+  - **Falha nº 3 (encaixe de W e R nos quadros de impacto `0,70 s` e `1,25 s`)**: W em `0,70 s` deslocado ~14 px para cima/direita pelo `wOvershoot` + rebote até `0,85 s`; R em `1,25 s` erguido em `+Y` pelo `rOvershoot` expondo rebarba cinza do W na base e degrau na quina. Atenção à armadilha conhecida: não deixar `meshRLamina` cruzar para `X < +0,5` nem `rSz < 1`.
+- **Observação útil**: `progressoPonteW` em `animacao.ts` hoje acompanha `estado.wPosT`, fazendo a ponte interna crescer a partir de `T_left` antes de o W chegar ao cubo (visível em `t-0.55s-desktop.png` e `t-0.66s-desktop.png`). Não afeta a falha nº 1 nem cruza faces sólidas, mas vale revisar quando mexer em `animacao.ts` na falha nº 3.
