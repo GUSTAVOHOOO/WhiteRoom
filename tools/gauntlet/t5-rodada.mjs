@@ -215,15 +215,37 @@ function extrairPngsDeIco(icoBuf) {
 	return out;
 }
 
+function carregarPng16Rodada2() {
+	try {
+		const res = spawnSync('git', ['show', 'ce2d1c0:public/favicon.ico'], {
+			cwd: ROOT_DIR,
+			maxBuffer: 2 * 1024 * 1024,
+		});
+		if (res.status === 0 && res.stdout && res.stdout.length > 22) {
+			const entries = extrairPngsDeIco(res.stdout);
+			const e16 = entries.find((e) => e.width === 16);
+			if (e16) return e16.png;
+		}
+	} catch {
+		// fallback abaixo
+	}
+	return null;
+}
+
 async function gerarFolhaFavicon(dirSaida) {
 	const icoBuf = fs.readFileSync(path.join(PUBLIC_DIR, 'favicon.ico'));
 	const entries = extrairPngsDeIco(icoBuf);
 	const png16 = entries.find((e) => e.width === 16)?.png;
 	const png32 = entries.find((e) => e.width === 32)?.png;
 	const png48 = entries.find((e) => e.width === 48)?.png;
+	const png16R2 = carregarPng16Rodada2();
 	const svgFavicon = fs.readFileSync(path.join(PUBLIC_DIR, 'favicon.svg'), 'utf8');
 	const png16Svg = await sharp(Buffer.from(svgFavicon.replace('<svg ', '<svg width="16" height="16" ')))
 		.resize(16, 16)
+		.png()
+		.toBuffer();
+	const png32Svg = await sharp(Buffer.from(svgFavicon.replace('<svg ', '<svg width="32" height="32" ')))
+		.resize(32, 32)
 		.png()
 		.toBuffer();
 	const png180 = fs.readFileSync(path.join(PUBLIC_DIR, 'apple-touch-icon.png'));
@@ -256,6 +278,7 @@ async function gerarFolhaFavicon(dirSaida) {
 	const fundos = [
 		{
 			titulo: 'Sobre fundo claro (#FAFAF8)',
+			curto: 'Claro #FAFAF8',
 			rgb: { r: 250, g: 250, b: 248, alpha: 1 },
 			textoCor: '#171717',
 			tabBarBg: '#EAEAE6',
@@ -265,6 +288,7 @@ async function gerarFolhaFavicon(dirSaida) {
 		},
 		{
 			titulo: 'Sobre fundo branco (#FFFFFF)',
+			curto: 'Branco #FFFFFF',
 			rgb: { r: 255, g: 255, b: 255, alpha: 1 },
 			textoCor: '#171717',
 			tabBarBg: '#EEF0F2',
@@ -274,6 +298,7 @@ async function gerarFolhaFavicon(dirSaida) {
 		},
 		{
 			titulo: 'Sobre fundo escuro (#202124)',
+			curto: 'Escuro #202124',
 			rgb: { r: 32, g: 33, b: 36, alpha: 1 },
 			textoCor: '#FAFAF8',
 			tabBarBg: '#17181A',
@@ -283,14 +308,20 @@ async function gerarFolhaFavicon(dirSaida) {
 		},
 	];
 
-	const totalH = tituloH + pad + fundos.length * (rowHeaderH + rowBoxH + pad);
+	const mostrarComparacao8x = Boolean(png16R2);
+	const comp8xBoxH = 196;
+	const totalH =
+		tituloH +
+		pad +
+		fundos.length * (rowHeaderH + rowBoxH + pad) +
+		(mostrarComparacao8x ? rowHeaderH + comp8xBoxH + pad : 0);
 
 	const composites = [
 		{
 			input: criarEtiquetaSvg(
 				totalW,
 				tituloH,
-				`T5 Rodada ${rodada} — Favicons (16/32/48 em 4× nearest), Ícones (180, 192, 512, maskable 512) e Simulação de Aba 16 px`,
+				`T5 Rodada ${rodada} — Favicons (16/32/48 em 4× nearest), Ícones (180, 192, 512, maskable 512), Aba 16 px e Comparação 8×`,
 				'#171717',
 				'#FAFAF8',
 			),
@@ -353,6 +384,69 @@ async function gerarFolhaFavicon(dirSaida) {
 		}
 
 		y += rowBoxH + pad;
+	}
+
+	if (mostrarComparacao8x) {
+		composites.push({
+			input: criarEtiquetaSvg(
+				faixaW,
+				rowHeaderH,
+				`Comparação 8× nearest-neighbor (128×128): 16×16 Rodada 2 vs 16×16 Final (Rodada ${rodada}) + favicon.svg (16 px em 8× e 32 px em 4×)`,
+				'#262624',
+				'#FAFAF8',
+			),
+			left: pad,
+			top: y,
+		});
+		y += rowHeaderH;
+
+		const z8R2 = await sharp(png16R2).resize(128, 128, { kernel: 'nearest' }).png().toBuffer();
+		const z8Final = await sharp(png16).resize(128, 128, { kernel: 'nearest' }).png().toBuffer();
+		const z8Svg16 = await sharp(png16Svg).resize(128, 128, { kernel: 'nearest' }).png().toBuffer();
+		const z4Svg32 = await sharp(png32Svg).resize(128, 128, { kernel: 'nearest' }).png().toBuffer();
+
+		// Três painéis (Claro, Branco, Escuro) lado a lado: os 2 primeiros comparam R2 vs Final ICO 16;
+		// o painel escuro + bloco final mostra R2 vs Final + favicon.svg 16 px (8×) e 32 px (4×).
+		const wClaro = 456;
+		const wEscuro = 324;
+		const wSvg = faixaW - wClaro - wEscuro;
+
+		const painelComp = `<svg xmlns="http://www.w3.org/2000/svg" width="${faixaW}" height="${comp8xBoxH}">
+			<rect x="0" y="0" width="${wClaro}" height="${comp8xBoxH}" fill="#FAFAF8"/>
+			<rect x="${wClaro}" y="0" width="${wEscuro}" height="${comp8xBoxH}" fill="#202124"/>
+			<rect x="${wClaro + wEscuro}" y="0" width="${wSvg}" height="${comp8xBoxH}" fill="#FFFFFF"/>
+			<line x1="${wClaro}" y1="0" x2="${wClaro}" y2="${comp8xBoxH}" stroke="#D8D7D2" stroke-width="1"/>
+			<line x1="${wClaro + wEscuro}" y1="0" x2="${wClaro + wEscuro}" y2="${comp8xBoxH}" stroke="#D8D7D2" stroke-width="1"/>
+			<text x="20" y="20" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700" fill="#6E6E6A">SOBRE CLARO (#FAFAF8)</text>
+			<text x="${wClaro + 20}" y="20" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700" fill="#9AA0A6">SOBRE ESCURO (#202124)</text>
+			<text x="${wClaro + wEscuro + 20}" y="20" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700" fill="#5F6368">FAVICON.SVG (1× E 2× EM #FFFFFF)</text>
+		</svg>`;
+		composites.push({ input: Buffer.from(painelComp), left: pad, top: y });
+
+		const compItens = [
+			{ x: 24, buf: z8R2, label: 'Rodada 2 · ICO 16 (8×)', cor: '#171717' },
+			{ x: 172, buf: z8Final, label: `Rodada ${rodada} · ICO 16 (8×)`, cor: '#171717' },
+			{ x: 320, buf: z8Svg16, label: `Rodada ${rodada} · SVG 16 (8×)`, cor: '#171717' },
+			{ x: wClaro + 24, buf: z8R2, label: 'Rodada 2 · ICO 16 (8×)', cor: '#FAFAF8' },
+			{ x: wClaro + 172, buf: z8Final, label: `Rodada ${rodada} · ICO 16 (8×)`, cor: '#FAFAF8' },
+			{ x: wClaro + wEscuro + 24, buf: z8Final, label: `Rodada ${rodada} · ICO 16 (8×)`, cor: '#171717' },
+			{ x: wClaro + wEscuro + 172, buf: z8Svg16, label: 'favicon.svg 16 px (8×)', cor: '#171717' },
+			{ x: wClaro + wEscuro + 320, buf: z4Svg32, label: 'favicon.svg 32 px (4×)', cor: '#171717' },
+		];
+
+		for (const ci of compItens) {
+			if (ci.x + 128 > faixaW) continue;
+			composites.push({ input: ci.buf, left: pad + ci.x, top: y + 32 });
+			composites.push({
+				input: Buffer.from(
+					`<svg xmlns="http://www.w3.org/2000/svg" width="144" height="22">
+						<text x="72" y="15" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="600" fill="${ci.cor}">${escaparXml(ci.label)}</text>
+					</svg>`,
+				),
+				left: pad + ci.x - 8,
+				top: y + 166,
+			});
+		}
 	}
 
 	const favPath = path.join(dirSaida, 'favicon.png');
@@ -1694,6 +1788,73 @@ try {
 
 			const faviconSvgDisk = fs.readFileSync(path.join(PUBLIC_DIR, 'favicon.svg'), 'utf8');
 			const semPrefersColorScheme = !/prefers-color-scheme/i.test(faviconSvgDisk);
+			const faviconSvgViewBox16 = /viewBox="0 0 16 16"/.test(faviconSvgDisk);
+			const faviconSvgPathsInteiros = [...faviconSvgDisk.matchAll(/\bd="([^"]+)"/g)].every(
+				(m) => !/\d\.\d/.test(m[1]),
+			);
+
+			// Auditoria pixel-a-pixel do 16×16 do ICO: R puro #CD9016, W puro #171717, aro #FFFFFF, furo e vão nítidos
+			const png16Raw = await sharp(icoEntries.find((e) => e.width === 16).png).ensureAlpha().raw().toBuffer();
+			const hexEm = (px, py) => {
+				const o = (py * 16 + px) * 4;
+				if (png16Raw[o + 3] < 128) return null;
+				return `#${[png16Raw[o], png16Raw[o + 1], png16Raw[o + 2]].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+			};
+			let pxRPuros = 0;
+			let pxWPuros = 0;
+			let pxTopoBrancos = 0;
+			let pxVaoWCol3 = 0;
+			let pxVaoWCol6 = 0;
+			let pxFuroR = 0;
+			const coresR = new Map();
+			const coresW = new Map();
+			for (let py = 1; py <= 14; py++) {
+				for (let px = 1; px <= 14; px++) {
+					const h = hexEm(px, py);
+					if (!h) continue;
+					if (h === '#FFFFFF' && py <= 7) pxTopoBrancos++;
+					if (px >= 8 && py >= 6 && py <= 14) {
+						if (h !== '#FAFAF8' && h !== '#FFFFFF' && h !== '#C6C5C1') {
+							coresR.set(h, (coresR.get(h) ?? 0) + 1);
+						}
+						if (h === '#CD9016') pxRPuros++;
+						if (h === '#FAFAF8' && px >= 9 && px <= 12 && py >= 7 && py <= 9) pxFuroR++;
+					}
+					if (px >= 2 && px <= 7 && py >= 5 && py <= 14) {
+						if (h !== '#FAFAF8' && h !== '#FFFFFF' && h !== '#C6C5C1') {
+							coresW.set(h, (coresW.get(h) ?? 0) + 1);
+						}
+						if (h === '#171717') pxWPuros++;
+						if (h === '#C6C5C1' && px === 3 && py >= 5 && py <= 9) pxVaoWCol3++;
+						if (h === '#C6C5C1' && px === 6 && py >= 5 && py <= 10) pxVaoWCol6++;
+					}
+				}
+			}
+			const corDominanteR = [...coresR.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+			const corDominanteW = [...coresW.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+			const pixelAudit16 = {
+				ok:
+					faviconSvgViewBox16 &&
+					faviconSvgPathsInteiros &&
+					corDominanteR === '#CD9016' &&
+					corDominanteW === '#171717' &&
+					pxRPuros >= 20 &&
+					pxWPuros >= 20 &&
+					pxTopoBrancos >= 12 &&
+					pxVaoWCol3 >= 3 &&
+					pxVaoWCol6 >= 3 &&
+					pxFuroR >= 3,
+				faviconSvgViewBox16,
+				faviconSvgPathsInteiros,
+				corDominanteR,
+				corDominanteW,
+				pxRPuros,
+				pxWPuros,
+				pxTopoBrancos,
+				pxVaoWCol3,
+				pxVaoWCol6,
+				pxFuroR,
+			};
 
 			const alphaCanto = async (bufOrPath) => {
 				const raw = await sharp(bufOrPath).ensureAlpha().raw().toBuffer();
@@ -1750,11 +1911,12 @@ try {
 				headLinks.temManifest;
 
 			faviconResumo = {
-				ok: todos200 && icoOk && semPrefersColorScheme && cantosOk && manifestOk && headOk,
+				ok: todos200 && icoOk && semPrefersColorScheme && pixelAudit16.ok && cantosOk && manifestOk && headOk,
 				todos200,
 				icoTamanhos,
 				icoOk,
 				semPrefersColorScheme,
+				pixelAudit16,
 				cantosOk,
 				cantos,
 				manifestOk,
