@@ -1,17 +1,17 @@
 {
   "rodada": 1,
-  "timestamp": "2026-11-24T03:47:55.330Z",
+  "timestamp": "2026-11-24T03:52:10.269Z",
   "porta": 4403,
   "erroGate": null,
   "astroCheck": {
     "ok": true,
     "exitCode": 0,
-    "duracaoMs": 11003
+    "duracaoMs": 10532
   },
   "astroBuild": {
     "ok": true,
     "exitCode": 0,
-    "duracaoMs": 5021
+    "duracaoMs": 5197
   },
   "gerador": {
     "ok": true,
@@ -224,22 +224,22 @@
         "altura": 800
       },
       "quadroDeltaMs": {
-        "quadros": 252,
-        "mediaMs": 13.39,
+        "quadros": 248,
+        "mediaMs": 13.471,
         "p95Ms": 14.2,
-        "maxMs": 44.6
+        "maxMs": 66.7
       },
       "trabalhoQuadroMs": {
-        "quadros": 253,
-        "mediaMs": 1.182,
-        "p95Ms": 3.9,
-        "maxMs": 17.6
+        "quadros": 249,
+        "mediaMs": 1.357,
+        "p95Ms": 4.5,
+        "maxMs": 18.4
       },
       "hlrMs": {
-        "quadros": 188,
-        "mediaMs": 0.933,
-        "p95Ms": 3.3,
-        "maxMs": 4.5
+        "quadros": 184,
+        "mediaMs": 1.12,
+        "p95Ms": 3.8,
+        "maxMs": 5.5
       }
     },
     "mobile390x844Dpr3": {
@@ -248,22 +248,22 @@
         "altura": 844
       },
       "quadroDeltaMs": {
-        "quadros": 254,
-        "mediaMs": 13.256,
-        "p95Ms": 14.3,
-        "maxMs": 22
+        "quadros": 253,
+        "mediaMs": 13.288,
+        "p95Ms": 14.2,
+        "maxMs": 20.7
       },
       "trabalhoQuadroMs": {
-        "quadros": 255,
-        "mediaMs": 1.354,
-        "p95Ms": 4.4,
-        "maxMs": 14
+        "quadros": 254,
+        "mediaMs": 1.112,
+        "p95Ms": 3.2,
+        "maxMs": 13.4
       },
       "hlrMs": {
-        "quadros": 190,
-        "mediaMs": 1.103,
-        "p95Ms": 3.4,
-        "maxMs": 5.6
+        "quadros": 189,
+        "mediaMs": 0.86,
+        "p95Ms": 2.6,
+        "maxMs": 4.8
       }
     },
     "hlrOk": true
@@ -280,14 +280,14 @@
     "fluxoNormalEReload": {
       "ok": true,
       "iniciouSplash": true,
-      "duracaoTotalMs": 3177,
+      "duracaoTotalMs": 3167,
       "probe": {
         "ok": true,
-        "amostrasTotais": 234,
+        "amostrasTotais": 233,
         "amostrasAntes3D": 4,
         "quadrosReservaVisivelAntes3D": 0,
         "quadrosReservaVisivelTotal": 0,
-        "quadrosSvgFinal": 38,
+        "quadrosSvgFinal": 37,
         "fundoEmFadeDuranteSvg": true
       },
       "estadoPosFim": {
@@ -319,9 +319,9 @@
     },
     "pularMeioMontagem": {
       "ok": true,
-      "tempoAposCliqueMs": 309,
+      "tempoAposCliqueMs": 307,
       "alvoVisivel": true,
-      "amostras": 24,
+      "amostras": 23,
       "quadrosSvgFinal": 23,
       "svgLarguraInicialPx": 800,
       "svgLarguraFinalPx": 70.62,
@@ -336,15 +336,15 @@
     },
     "pularEsc": {
       "ok": true,
-      "tempoAposEscMs": 297,
+      "tempoAposEscMs": 300,
       "alvoVisivel": true
     },
     "movimentoReduzido": {
       "ok": true,
       "iniciouReduzida": true,
-      "duracaoMs": 968,
+      "duracaoMs": 981,
       "alvoVisivel": true,
-      "quadrosVisiveis": 70,
+      "quadrosVisiveis": 71,
       "visivelDesdeInicio": true,
       "usaWhiteroomLogoSvg": true,
       "maxDeslocamentoPx": 0,
@@ -353,7 +353,7 @@
     "fallbackFalha": {
       "ok": true,
       "alvoVisivel": true,
-      "quadrosVisiveis": 39,
+      "quadrosVisiveis": 38,
       "usaWhiteroomLogoSvg": true,
       "deslocamentoPx": 594.45,
       "diminuiuTamanho": true,

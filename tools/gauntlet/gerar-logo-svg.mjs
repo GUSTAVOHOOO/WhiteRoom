@@ -1049,6 +1049,12 @@ function listarDestinos(resultado, outDir, publicDir) {
 	];
 }
 
+function buffersIguais(atual, esperado, ehTexto) {
+	if (atual === null) return false;
+	if (!ehTexto) return atual.equals(esperado);
+	return atual.toString('utf8').replace(/\r\n/g, '\n') === esperado.toString('utf8').replace(/\r\n/g, '\n');
+}
+
 async function main() {
 	const opts = parseArgs(process.argv.slice(2));
 	const resultado = await gerarLogosSvg(opts);
@@ -1058,7 +1064,8 @@ async function main() {
 		let tudoIgual = true;
 		for (const item of destinos) {
 			const atual = fs.existsSync(item.caminho) ? fs.readFileSync(item.caminho) : null;
-			const igual = atual !== null && atual.equals(item.conteudo);
+			const ehTexto = item.nome.endsWith('.svg') || item.nome.endsWith('.webmanifest');
+			const igual = buffersIguais(atual, item.conteudo, ehTexto);
 			if (!igual) tudoIgual = false;
 			console.log(
 				`[gerar-logo-svg --check] ${item.nome.padEnd(26)}: ${igual ? 'IGUAL' : 'DIFERENTE'} (${item.conteudo.length} B)`,

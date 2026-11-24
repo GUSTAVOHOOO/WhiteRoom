@@ -510,7 +510,13 @@ try {
 	let todosIguais = true;
 	for (const item of arquivosVerificar) {
 		const disco = fs.existsSync(item.caminho) ? fs.readFileSync(item.caminho) : null;
-		const igual = disco !== null && disco.equals(item.esperado);
+		const ehTexto = item.nome.endsWith('.svg') || item.nome.endsWith('.webmanifest');
+		const igual =
+			disco !== null &&
+			(ehTexto
+				? disco.toString('utf8').replace(/\r\n/g, '\n') ===
+					item.esperado.toString('utf8').replace(/\r\n/g, '\n')
+				: disco.equals(item.esperado));
 		if (!igual) todosIguais = false;
 		verificacoesArquivos[item.nome] = {
 			igual,

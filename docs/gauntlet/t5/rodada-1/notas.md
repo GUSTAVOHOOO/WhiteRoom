@@ -39,8 +39,8 @@ Gerados pelo mesmo `tools/gauntlet/gerar-logo-svg.mjs` a partir da logo sem linh
 
 ## 4. Métricas do gate (`docs/gauntlet/t5/rodada-1/metricas.json`)
 
-- **`astro check`**: OK (`11,00 s`, 0 erros, 0 avisos, 0 hints).
-- **`astro build`**: OK (`5,02 s`).
+- **`astro check`**: OK (`10,53 s`, 0 erros, 0 avisos, 0 hints).
+- **`astro build`**: OK (`5,20 s`).
 - **Console do navegador**: `0 erros`, `0 avisos`, `0 pageErrors`.
 - **Reprodutibilidade do gerador**: **8/8 ativos byte-a-byte idênticos**; zero gradientes/filtros/imagens; `logo-provisoria.svg` removida.
   - `src/assets/logo/whiteroom-logo.svg`: **`7,55 KB`** (`7.732 B`, meta `≤ 30 KB`).
@@ -56,8 +56,8 @@ Gerados pelo mesmo `tools/gauntlet/gerar-logo-svg.mjs` a partir da logo sem linh
   - Diff do recorte `56×56` do header (`3,10 s` vs pós-splash): **`0,0319%`** (`1 / 3.136 px`), sem pontos soltos nem degraus.
 - **Pose final T4 (`t=2,4 s`, 1024×1024 vs T2 R7)**: **`0,0000%`** (`0 / 1.048.576 px`, meta `≤ 0,3%`).
 - **Desempenho (`/?debug=t4`)**:
-  - Desktop `1280×800 dpr 1`: rAF médio **`13,390 ms`** (`p95 14,2`), trabalho **`1,182 ms`** (`p95 3,9`), HLR **`0,933 ms`** (`p95 3,3`, meta `≤ 4 ms`).
-  - Mobile `390×844 dpr 3`: rAF médio **`13,256 ms`** (`p95 14,3`), trabalho **`1,354 ms`** (`p95 4,4`), HLR **`1,103 ms`** (`p95 3,4`, meta `≤ 4 ms`).
+  - Desktop `1280×800 dpr 1`: rAF médio **`13,471 ms`** (`p95 14,2`), trabalho **`1,357 ms`** (`p95 4,5`), HLR **`1,120 ms`** (`p95 3,8`, meta `≤ 4 ms`).
+  - Mobile `390×844 dpr 3`: rAF médio **`13,288 ms`** (`p95 14,2`), trabalho **`1,112 ms`** (`p95 3,2`), HLR **`0,860 ms`** (`p95 2,6`, meta `≤ 4 ms`).
 - **Testes de fluxo, regressão e favicons**: **11/11 OK** (`fluxoNormalEReload`, `headerLogoNova`, `pularMeioMontagem` `309 ms`, `pularPosTroca` `306 ms`, `pularEsc` `297 ms`, `movimentoReduzido` `968 ms`, `fallbackFalha`, `regressaoDebugT2`, `determinismoEResize`, `estabilidadePosImpacto`, `faviconEManifest` com todas as 6 rotas HTTP 200 e os 4 `<link>` no `<head>`).
 
 ## 5. Evidências geradas
